@@ -359,7 +359,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--border); }
         <div class="section-num">§ 01</div>
         <h2>Abstract</h2>
         <p>
-          We identified and confirmed a <strong>use-after-free vulnerability</strong> in the Linux kernel's
+          I identified and confirmed a <strong>use-after-free vulnerability</strong> in the Linux kernel's
           vsock loopback transport, present in kernel 6.12.x and submitted as a kernelCTF research target.
           The bug lives in <code>virtio_transport_consume_skb_sent()</code> inside
           <code>net/vmw_vsock/virtio_transport_common.c</code> and is triggered by a race between the
@@ -513,7 +513,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--border); }
 
         <h3>Hardware Watchpoint Strategy</h3>
         <p>
-          We attached GDB to the QEMU kernel via <code>-s -S</code> flags and used conditional
+            I attached GDB to the QEMU kernel via <code>-s -S</code> flags and used conditional
           breakpoints to detect the UAF condition: <code>sk-&gt;__sk_common.skc_refcnt.refs.counter == 0</code>
           at the time <code>consume_skb_sent</code> runs. Hardware watchpoints were then armed on
           the identified <code>vvs+0x20</code>.
@@ -678,13 +678,13 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           This research was conducted using an <strong>AI collaboration pipeline</strong> in which a
           large language model served as a continuous technical co-researcher — from source reading and
           hypothesis formation through GDB script generation, PoC development, and exploit primitive
-          analysis. We document this methodology because it represents a reproducible approach to
+            analysis. I document this methodology because it represents a reproducible approach to
           kernel vulnerability research that meaningfully changes the speed and depth of analysis.
         </p>
 
         <h3>How the Pipeline Operated</h3>
         <p>
-          The workflow was entirely human-directed. The researcher controlled all decisions about what
+          The workflow was entirely human-directed. I controlled all decisions about what
           to investigate, what to run, and what the evidence meant. The AI operated as a stateful
           technical assistant with continuous access to source code, GDB output, and PoC results
           shared iteratively across the session. The model reasoned, proposed, and generated — it
@@ -703,7 +703,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
 
         <h3>The Iterative Feedback Loop</h3>
         <p>
-          Each iteration: researcher shares raw GDB output → AI reads it precisely (e.g., identifying
+          Each iteration: I shares raw GDB output → AI reads it precisely (e.g., identifying
           that a watchpoint was firing on a <em>different</em> vvs address than the target, meaning
           the freed slot was reclaimed by a new listener socket rather than the spray) → diagnosis →
           corrected PoC. The cycle repeated continuously until each hypothesis was either confirmed
@@ -722,7 +722,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           The model could not independently verify kernel addresses, run GDB, or access the target
           system. When it proposed <code>recv()</code> before <code>close()</code> as a fast-path
           trigger, careful source tracing revealed it cannot work — the workqueue delivers both
-          data SKBs and the peer shutdown packet in the same run. The researcher's empirical GDB
+          data SKBs and the peer shutdown packet in the same run. The my empirical GDB
           observations were the ground truth throughout. The model's value was in speed of
           cross-file analysis, not in replacing empirical validation.
         </p>
@@ -743,7 +743,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
       <!-- 7 -->
       <section id="s7">
         <div class="section-num">§ 07</div>
-        <h2>What We Learned About the Kernel</h2>
+        <h2>What I Learned About the Kernel</h2>
 
         <h3>Socket Lifecycle is Non-Trivial</h3>
         <p>
@@ -793,7 +793,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
         <div class="section-num">§ 08</div>
         <h2>Conclusion</h2>
         <p>
-          We identified, confirmed, and deeply analyzed a use-after-free in the Linux kernel's vsock
+          I identified, confirmed, and deeply analyzed a use-after-free in the Linux kernel's vsock
           loopback transport — <code>virtio_transport_consume_skb_sent()</code> in
           <code>net/vmw_vsock/virtio_transport_common.c</code>, present in kernel 6.12.x.
         </p>
@@ -809,7 +809,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           The research demonstrates that AI-augmented kernel analysis is a practically viable
           methodology — capable of identifying, tracing, and characterizing complex multi-file
           kernel race conditions at depth and speed that significantly exceeds purely manual
-          analysis, provided the researcher maintains empirical control and treats every model
+          analysis, provided I maintain maintains empirical control and treats every model
           hypothesis as a testable claim.
         </p>
 
