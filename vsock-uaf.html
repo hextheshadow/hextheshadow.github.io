@@ -265,6 +265,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
   letter-spacing: 0.06em;
 }
 
+/* ── AUTHOR BYLINE ── */
+.author-byline {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.author-byline span { color: var(--green); }
+
 /* ── FOOTER ── */
 footer { padding: 40px 0; border-top: 1px solid var(--border); }
 .footer-inner {
@@ -319,7 +331,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--border); }
     <h1 class="post-title">Use-After-Free in Linux vsock<br>Loopback Transport</h1>
     <p class="post-subtitle">virtio_transport_consume_skb_sent() — net/vmw_vsock/virtio_transport_common.c</p>
     <div class="post-meta">
-      <div class="meta-item"><span class="meta-label">Target</span><span class="meta-val">Linux 6.12.x</span></div>
+      <div class="meta-item"><span class="meta-label">Target</span><span class="meta-val">linux-6.12.79</span></div>
       <div class="meta-item"><span class="meta-label">Subsystem</span><span class="meta-val">net/vmw_vsock</span></div>
       <div class="meta-item"><span class="meta-label">Primitive</span><span class="meta-val">UAF Write + Read</span></div>
       <div class="meta-item"><span class="meta-label">Slab Cache</span><span class="meta-val">kmalloc-96</span></div>
@@ -360,7 +372,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--border); }
         <h2>Abstract</h2>
         <p>
           I identified and confirmed a <strong>use-after-free vulnerability</strong> in the Linux kernel's
-          vsock loopback transport, present in kernel 6.12.x and submitted as a kernelCTF research target.
+          vsock loopback transport, present in linux-6.12.79.
           The bug lives in <code>virtio_transport_consume_skb_sent()</code> inside
           <code>net/vmw_vsock/virtio_transport_common.c</code> and is triggered by a race between the
           loopback workqueue and the socket teardown path.
@@ -513,7 +525,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--border); }
 
         <h3>Hardware Watchpoint Strategy</h3>
         <p>
-            I attached GDB to the QEMU kernel via <code>-s -S</code> flags and used conditional
+          I attached GDB to the QEMU kernel via <code>-s -S</code> flags and used conditional
           breakpoints to detect the UAF condition: <code>sk-&gt;__sk_common.skc_refcnt.refs.counter == 0</code>
           at the time <code>consume_skb_sent</code> runs. Hardware watchpoints were then armed on
           the identified <code>vvs+0x20</code>.
@@ -678,7 +690,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           This research was conducted using an <strong>AI collaboration pipeline</strong> in which a
           large language model served as a continuous technical co-researcher — from source reading and
           hypothesis formation through GDB script generation, PoC development, and exploit primitive
-            analysis. I document this methodology because it represents a reproducible approach to
+          analysis. I document this methodology because it represents a reproducible approach to
           kernel vulnerability research that meaningfully changes the speed and depth of analysis.
         </p>
 
@@ -703,7 +715,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
 
         <h3>The Iterative Feedback Loop</h3>
         <p>
-          Each iteration: I shares raw GDB output → AI reads it precisely (e.g., identifying
+          Each iteration: I share raw GDB output → AI reads it precisely (e.g., identifying
           that a watchpoint was firing on a <em>different</em> vvs address than the target, meaning
           the freed slot was reclaimed by a new listener socket rather than the spray) → diagnosis →
           corrected PoC. The cycle repeated continuously until each hypothesis was either confirmed
@@ -722,7 +734,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           The model could not independently verify kernel addresses, run GDB, or access the target
           system. When it proposed <code>recv()</code> before <code>close()</code> as a fast-path
           trigger, careful source tracing revealed it cannot work — the workqueue delivers both
-          data SKBs and the peer shutdown packet in the same run. The my empirical GDB
+          data SKBs and the peer shutdown packet in the same run. My empirical GDB
           observations were the ground truth throughout. The model's value was in speed of
           cross-file analysis, not in replacing empirical validation.
         </p>
@@ -733,9 +745,9 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           a call graph with a model that maintains working context across multiple files in parallel —
           reading <code>af_vsock.c</code>, <code>virtio_transport_common.c</code>, and
           <code>vsock_loopback.c</code> cross-referencing them on demand. This accelerates hypothesis
-          generation dramatically. However, the pipeline succeeds precisely because the human
-          researcher maintains <strong>epistemic control</strong> — every hypothesis is tested
-          empirically, every GDB output shared in full, and the researcher exercises judgment about
+          generation dramatically. However, the pipeline succeeds precisely because
+          I maintain <strong>epistemic control</strong> — every hypothesis is tested
+          empirically, every GDB output shared in full, and I exercise judgment about
           direction. The model is a force multiplier for existing expertise, not a replacement for it.
         </p>
       </section>
@@ -795,7 +807,7 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
         <p>
           I identified, confirmed, and deeply analyzed a use-after-free in the Linux kernel's vsock
           loopback transport — <code>virtio_transport_consume_skb_sent()</code> in
-          <code>net/vmw_vsock/virtio_transport_common.c</code>, present in kernel 6.12.x.
+          <code>net/vmw_vsock/virtio_transport_common.c</code>, present in linux-6.12.79.
         </p>
         <p>
           The bug yields a <strong>KASAN-silent, controlled, repeatable write primitive</strong>
@@ -809,23 +821,16 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           The research demonstrates that AI-augmented kernel analysis is a practically viable
           methodology — capable of identifying, tracing, and characterizing complex multi-file
           kernel race conditions at depth and speed that significantly exceeds purely manual
-          analysis, provided I maintain maintains empirical control and treats every model
+          analysis, provided I maintain empirical control and treat every model
           hypothesis as a testable claim.
         </p>
-
-        <div class="callout callout-dim">
-          <div class="callout-title">Disclosure</div>
-          Conducted as part of kernelCTF, a competition specifically designed for kernel
-          vulnerability research. All experiments in isolated QEMU environments.
-          No production systems targeted.
-        </div>
 
         <hr>
 
         <h3>Affected Versions</h3>
         <table>
           <tr><th>Field</th><th>Value</th></tr>
-          <tr><td>Kernel</td><td>Linux 6.12.x (kernelCTF)</td></tr>
+          <tr><td>Kernel</td><td>linux-6.12.79</td></tr>
           <tr><td>Subsystem</td><td>net/vmw_vsock</td></tr>
           <tr><td>Function</td><td><code>virtio_transport_consume_skb_sent()</code></td></tr>
           <tr><td>Files</td><td><code>virtio_transport_common.c</code>, <code>vsock_loopback.c</code>, <code>af_vsock.c</code></td></tr>
@@ -833,6 +838,9 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
           <tr><td>KASAN</td><td>Not triggered</td></tr>
           <tr><td>Config required</td><td>CONFIG_VSOCKETS + CONFIG_VIRTIO_VSOCKETS</td></tr>
         </table>
+
+        <div class="author-byline">— hex<span>the</span>shadow</div>
+
       </section>
 
     </main>
