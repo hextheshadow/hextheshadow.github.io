@@ -239,6 +239,78 @@ h1          { animation-delay: 0.12s; }
   .finding { grid-template-columns: 1fr; }
   .finding-meta { flex-direction: row; align-items: center; text-align: left; }
 }
+.writing-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.writing-card {
+  display: block;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  padding: 24px 28px;
+  border-radius: 4px;
+  background: var(--surface);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.writing-card:hover {
+  border-color: var(--accent);
+  background: rgba(0, 229, 255, 0.03);
+}
+
+.writing-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.writing-date {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.writing-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.writing-card-title {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 10px;
+  line-height: 1.35;
+}
+
+.writing-card-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+
+.writing-card-desc code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: rgba(0, 229, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+.writing-card-cta {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
 </style>
 </head>
 <body>
@@ -456,17 +528,34 @@ h1          { animation-delay: 0.12s; }
     </div>
   </section>
 
-  <section class="section" id="writing">
-    <div class="section-header">
-      <span class="section-num">04</span>
-      <span class="section-title">Writing</span>
-      <div class="section-line"></div>
-    </div>
-    <div class="writing-placeholder">
-      <div class="mono">// writeups coming soon</div>
-      <p>Technical deep-dives on findings currently under responsible disclosure</p>
-    </div>
-  </section>
+<section class="section" id="writing">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">Writing</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="writing-grid">
+    <a href="/vsock-uaf.html" class="writing-card">
+      <div class="writing-card-meta">
+        <span class="writing-date">2026</span>
+        <span class="writing-tags">
+          <span class="tag">Linux Kernel</span>
+          <span class="tag">kernelCTF</span>
+          <span class="tag">UAF</span>
+        </span>
+      </div>
+      <h3 class="writing-card-title">
+        Use-After-Free in Linux vsock Loopback Transport
+      </h3>
+      <p class="writing-card-desc">
+        UAF in <code>virtio_transport_consume_skb_sent()</code> — controlled
+        write primitive on kmalloc-96, KASAN-silent, confirmed via GDB hardware
+        watchpoints. AI-augmented kernel research pipeline.
+      </p>
+      <span class="writing-card-cta">Read Writeup →</span>
+    </a>
+  </div>
+</section>
 
 </div>
 
