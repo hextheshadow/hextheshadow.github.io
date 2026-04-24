@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVE Research: Linux vsock Loopback UAF — Technical Writeup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #0f1318;
+    --border: #1e2530;
+    --accent: #00e5ff;
+    --accent2: #ff4d6d;
+    --accent3: #b8ff57;
+    --text: #c8d4e0;
+    --text-dim: #5a6a7a;
+    --text-bright: #eaf2ff;
+    --code-bg: #080b0e;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.75;
+    min-height: 100vh;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 28px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 64px 0 48px;
+    margin-bottom: 64px;
+    position: relative;
+  }
+
+  .tag-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 2px;
+  }
+
+  .tag-kernel  { background: rgba(0,229,255,0.08); color: var(--accent);  border: 1px solid rgba(0,229,255,0.2); }
+  .tag-uaf     { background: rgba(255,77,109,0.08); color: var(--accent2); border: 1px solid rgba(255,77,109,0.2); }
+  .tag-vuln    { background: rgba(184,255,87,0.08); color: var(--accent3); border: 1px solid rgba(184,255,87,0.2); }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(22px, 4vw, 34px);
+    font-weight: 600;
+    color: var(--text-bright);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-weight: 300;
+    letter-spacing: 0.04em;
+  }
+
+  .meta-bar {
+    display: flex;
+    gap: 32px;
+    margin-top: 28px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .meta-item { display: flex; flex-direction: column; gap: 3px; }
+  .meta-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); }
+  .meta-val   { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+
+  /* ── SIDEBAR TOC ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 64px;
+    align-items: start;
+  }
+
+  .toc {
+    position: sticky;
+    top: 40px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border-left: 1px solid var(--border);
+    padding-left: 16px;
+  }
+
+  .toc-title {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .toc a {
+    display: block;
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 4px 0;
+    line-height: 1.4;
+    transition: color 0.15s;
+  }
+
+  .toc a:hover { color: var(--accent); }
+  .toc .toc-sub { padding-left: 10px; font-size: 10px; }
+
+  /* ── SECTIONS ── */
+  .content section {
+    margin-bottom: 72px;
+    animation: fadein 0.5s ease both;
+  }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 24px;
+    letter-spacing: -0.01em;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    margin: 28px 0 12px;
+    letter-spacing: 0.04em;
+  }
+
+  p { margin-bottom: 16px; color: var(--text); }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  strong { color: var(--text-bright); font-weight: 600; }
+
+  em { color: var(--accent3); font-style: normal; font-family: var(--mono); font-size: 0.92em; }
+
+  /* ── CODE BLOCKS ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 20px 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: #8dbccc;
+  }
+
+  pre.danger { border-left-color: var(--accent2); }
+  pre.confirm { border-left-color: var(--accent3); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: rgba(0,229,255,0.06);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 2px;
+  }
+
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+  }
+
+  /* syntax highlight tokens */
+  .kw  { color: #ff79c6; }
+  .fn  { color: #8be9fd; }
+  .cm  { color: #44546a; font-style: italic; }
+  .st  { color: #f1fa8c; }
+  .nu  { color: #bd93f9; }
+  .ty  { color: #ffb86c; }
+  .ok  { color: #b8ff57; }
+  .bad { color: #ff4d6d; }
+
+  /* ── CALLOUT BOXES ── */
+  .callout {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+
+  .callout-confirm { border-left: 3px solid var(--accent3); background: rgba(184,255,87,0.03); }
+  .callout-warn    { border-left: 3px solid var(--accent2); background: rgba(255,77,109,0.03); }
+  .callout-info    { border-left: 3px solid var(--accent);  background: rgba(0,229,255,0.03); }
+
+  .callout-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .callout-confirm .callout-title { color: var(--accent3); }
+  .callout-warn    .callout-title { color: var(--accent2); }
+  .callout-info    .callout-title { color: var(--accent);  }
+
+  /* ── TABLES ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12px;
+    margin: 20px 0;
+  }
+
+  th {
+    text-align: left;
+    padding: 8px 14px;
+    background: rgba(0,229,255,0.05);
+    color: var(--accent);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid rgba(30,37,48,0.7);
+    color: var(--text);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  td.ok  { color: var(--accent3); }
+  td.bad { color: var(--accent2); }
+  td.nu  { color: var(--accent); }
+
+  /* ── TIMELINE ── */
+  .timeline { margin: 20px 0; }
+
+  .tl-item {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .tl-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 28px;
+    bottom: -8px;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .tl-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .tl-dot.ok  { background: rgba(184,255,87,0.12);  color: var(--accent3); border: 1px solid rgba(184,255,87,0.3); }
+  .tl-dot.bad { background: rgba(255,77,109,0.12);  color: var(--accent2); border: 1px solid rgba(255,77,109,0.3); }
+  .tl-dot.nu  { background: rgba(0,229,255,0.08);   color: var(--accent);  border: 1px solid rgba(0,229,255,0.2); }
+
+  .tl-body { padding-top: 2px; }
+  .tl-head { font-family: var(--mono); font-size: 12px; color: var(--text-bright); margin-bottom: 4px; }
+  .tl-desc { font-size: 13px; color: var(--text-dim); line-height: 1.55; }
+
+  /* ── DIVIDER ── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 0;
+    margin-top: 80px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    .toc { display: none; }
+    .meta-bar { gap: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="tag-row">
+      <span class="tag tag-kernel">Linux Kernel 6.12</span>
+      <span class="tag tag-uaf">Use-After-Free</span>
+      <span class="tag tag-vuln">AF_VSOCK / Loopback</span>
+      <span class="tag tag-vuln">kmalloc-96</span>
+    </div>
+    <h1>Use-After-Free in Linux vsock Loopback Transport:<br>Anatomy of a Kernel Write Primitive</h1>
+    <p class="subtitle">virtio_transport_consume_skb_sent() — net/vmw_vsock/virtio_transport_common.c</p>
+    <div class="meta-bar">
+      <div class="meta-item">
+        <span class="meta-label">Target</span>
+        <span class="meta-val">Linux 6.12.x (kernelCTF)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Subsystem</span>
+        <span class="meta-val">net/vmw_vsock</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Primitive</span>
+        <span class="meta-val">UAF Write + Read</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">KASAN</span>
+        <span class="meta-val">Silent</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Research Method</span>
+        <span class="meta-val">AI-Augmented</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- TOC -->
+    <nav class="toc">
+      <div class="toc-title">Contents</div>
+      <a href="#s1">1. Abstract</a>
+      <a href="#s2">2. Discovery</a>
+      <a href="#s3" class="toc-sub">— Source Navigation</a>
+      <a href="#s4">3. Vulnerability</a>
+      <a href="#s5" class="toc-sub">— Struct Layout</a>
+      <a href="#s6" class="toc-sub">— Close Path</a>
+      <a href="#s7" class="toc-sub">— Race Window</a>
+      <a href="#s8">4. Confirmation</a>
+      <a href="#s9" class="toc-sub">— GDB Sessions</a>
+      <a href="#s10">5. Exploitation</a>
+      <a href="#s11" class="toc-sub">— Spray Objects</a>
+      <a href="#s12" class="toc-sub">— Ordering Problem</a>
+      <a href="#s13">6. AI Pipeline</a>
+      <a href="#s14">7. What We Learned</a>
+      <a href="#s15">8. Conclusion</a>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="content">
+
+      <!-- 1. ABSTRACT -->
+      <section id="s1">
+        <div class="section-num">§ 01</div>
+        <h2>Abstract</h2>
+        <p>
+          We identified and confirmed a <strong>use-after-free vulnerability</strong> in the Linux kernel's
+          vsock loopback transport, present in kernel version 6.12.x and submitted as a research target
+          for kernelCTF. The bug resides in <code>virtio_transport_consume_skb_sent()</code> within
+          <code>net/vmw_vsock/virtio_transport_common.c</code> and is triggered by a race condition
+          between the loopback workqueue and the socket teardown path.
+        </p>
+        <p>
+          The vulnerability yields a <strong>silent UAF write primitive</strong> — a controlled subtraction
+          on a <code>size_t</code> field of a freed or live kernel object — and a <strong>UAF read</strong>
+          that exposes raw kernel text and data pointers from freed socket memory.
+          Neither primitive triggers KASAN on the tested configuration.
+        </p>
+        <p>
+          This research was conducted using a novel <strong>AI-augmented kernel research pipeline</strong>,
+          in which an AI language model served as a continuous technical collaborator — reading source code,
+          reasoning about kernel internals, proposing hypotheses, and generating GDB scripts and PoC code
+          across an extended, iterative session. We document both the technical findings and the methodology.
+        </p>
+      </section>
+
+      <!-- 2. DISCOVERY -->
+      <section id="s2">
+        <div class="section-num">§ 02</div>
+        <h2>Discovery &amp; Initial Hypothesis</h2>
+
+        <h3>Why vsock?</h3>
+        <p>
+          The vmw_vsock subsystem implements virtual socket communication between a host and its guests,
+          and crucially — via the loopback transport — between processes on the same machine using
+          <code>VMADDR_CID_LOCAL</code>. This loopback path is less audited than the mainline network
+          stack, uses a dedicated workqueue (<em>vsock-loopback</em>), and manages socket-owned SKBs
+          that carry a back-pointer (<code>skb-&gt;sk</code>) to the originating socket.
+        </p>
+
+        <h3 id="s3">Source Navigation</h3>
+        <p>
+          The starting point was reading <code>vsock_loopback.c</code> and tracing the lifecycle of an
+          SKB from allocation to delivery. The file structure of interest was:
+        </p>
+        <table>
+          <tr><th>File</th><th>Role</th></tr>
+          <tr><td>net/vmw_vsock/af_vsock.c</td><td>Socket lifecycle, release/destruct path</td></tr>
+          <tr><td>net/vmw_vsock/vsock_loopback.c</td><td>Workqueue, pkt_queue, loopback send</td></tr>
+          <tr><td>net/vmw_vsock/virtio_transport_common.c</td><td>consume_skb_sent, close, credits</td></tr>
+        </table>
+        <p>
+          In <code>vsock_loopback_work()</code>, every SKB dequeued from <code>pkt_queue</code> passes
+          through <code>virtio_transport_consume_skb_sent(skb, false)</code> before being delivered to
+          the receiver. This function dereferences <code>skb-&gt;sk</code> without holding any reference
+          to the socket:
+        </p>
+        <pre><span class="cm">/* net/vmw_vsock/virtio_transport_common.c */</span>
+<span class="kw">void</span> <span class="fn">virtio_transport_consume_skb_sent</span>(<span class="kw">struct</span> <span class="ty">sk_buff</span> *skb, <span class="ty">bool</span> consume)
+{
+    <span class="kw">struct</span> <span class="ty">sock</span> *s = skb->sk;          <span class="cm">/* ← raw pointer, no refcount held */</span>
+
+    <span class="kw">if</span> (s && skb->len) {
+        <span class="kw">struct</span> <span class="ty">vsock_sock</span>  *vs  = vsock_sk(s);
+        <span class="kw">struct</span> <span class="ty">virtio_vsock_sock</span> *vvs;
+
+        vvs = vs->trans;                  <span class="cm">/* ← may be freed */</span>
+
+        spin_lock_bh(&vvs->tx_lock);      <span class="cm">/* ← UAF spin_lock  */</span>
+        vvs->bytes_unsent -= skb->len;    <span class="cm">/* ← UAF WRITE      */</span>
+        spin_unlock_bh(&vvs->tx_lock);
+    }
+    ...
+}</pre>
+
+        <p>
+          The hypothesis formed immediately: if the socket is closed (and <code>vvs</code> freed) while
+          SKBs referencing it still sit in the loopback <code>pkt_queue</code>, the workqueue will
+          dereference freed memory when it eventually runs.
+        </p>
+      </section>
+
+      <!-- 3. VULNERABILITY -->
+      <section id="s4">
+        <div class="section-num">§ 03</div>
+        <h2>Vulnerability Deep Dive</h2>
+
+        <h3 id="s5">struct virtio_vsock_sock — Memory Layout</h3>
+        <p>
+          <code>struct virtio_vsock_sock</code> is allocated via <code>kzalloc(sizeof(*vvs), GFP_KERNEL)</code>
+          in <code>virtio_transport_do_socket_init()</code>. On x86-64 with kernel 6.12, its size is
+          <strong>approximately 80 bytes</strong>, placing it in the <strong>kmalloc-96</strong> SLUB cache.
+        </p>
+        <table>
+          <tr><th>Offset</th><th>Field</th><th>Type</th><th>Notes</th></tr>
+          <tr><td class="nu">+0x00</td><td>rx_lock</td><td>spinlock_t</td><td>4 bytes</td></tr>
+          <tr><td class="nu">+0x08</td><td>rx_queue</td><td>sk_buff_head</td><td>skb receive queue</td></tr>
+          <tr><td class="nu">+0x18</td><td>tx_lock</td><td>spinlock_t</td><td>protects tx fields</td></tr>
+          <tr><td class="nu">+0x20</td><td><strong>bytes_unsent</strong></td><td>size_t</td><td><strong>UAF write target</strong></td></tr>
+          <tr><td class="nu">+0x28</td><td>tx_cnt</td><td>u32</td><td>tx packet counter</td></tr>
+          <tr><td class="nu">+0x30</td><td>peer_buf_alloc</td><td>u32</td><td>peer's buffer size</td></tr>
+          <tr><td class="nu">+0x34</td><td>peer_fwd_cnt</td><td>u32</td><td>peer forward count</td></tr>
+          <tr><td class="nu">+0x38</td><td>buf_alloc</td><td>u32</td><td>local buffer size</td></tr>
+          <tr><td class="nu">+0x3c</td><td>fwd_cnt</td><td>u32</td><td>forward count</td></tr>
+          <tr><td class="nu">+0x40</td><td>vsk</td><td>*vsock_sock</td><td>back-pointer</td></tr>
+        </table>
+        <p>
+          The write primitive lands at <strong>vvs+0x20</strong> (<code>bytes_unsent</code>),
+          subtracting <code>skb-&gt;len</code> (which we control via <code>SEND_SIZE</code>,
+          typically 8192 bytes). This is a <strong>controlled subtraction on a freed size_t</strong>.
+        </p>
+
+        <h3 id="s6">The Close Path — What kfree(vvs) Actually Requires</h3>
+        <p>
+          Reading the full teardown chain from source was essential. The path is non-trivial:
+        </p>
+        <div class="timeline">
+          <div class="tl-item">
+            <div class="tl-dot nu">1</div>
+            <div class="tl-body">
+              <div class="tl-head">close(fd) → vsock_release() → __vsock_release()</div>
+              <div class="tl-desc">Calls <code>vsk-&gt;transport-&gt;release(vsk)</code> = <code>virtio_transport_release()</code>. Sets SOCK_DEAD flag.</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot nu">2</div>
+            <div class="tl-body">
+              <div class="tl-head">virtio_transport_close() — the branching point</div>
+              <div class="tl-desc">
+                <strong>Fast path:</strong> if <code>peer_shutdown == SHUTDOWN_MASK</code> → sends RST, returns <code>true</code> → immediate teardown.<br>
+                <strong>Slow path:</strong> schedules <code>close_work</code> with <code>VSOCK_CLOSE_TIMEOUT = 8 * HZ</code> → returns <code>false</code>. kfree(vvs) deferred by 8 seconds.
+              </div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot nu">3</div>
+            <div class="tl-body">
+              <div class="tl-head">sock_put(sk) → refcount drop → vsock_sk_destruct()</div>
+              <div class="tl-desc">Calls <code>vsock_deassign_transport()</code> → <code>vsk-&gt;transport-&gt;destruct(vsk)</code> = <code>virtio_transport_destruct()</code>.</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot bad">4</div>
+            <div class="tl-body">
+              <div class="tl-head">kfree(vvs) — slot returns to kmalloc-96</div>
+              <div class="tl-desc">Only now is <code>vvs</code> actually freed. <code>vsk-&gt;trans = NULL</code> set immediately after.</div>
+            </div>
+          </div>
+        </div>
+        <p>
+          Critically: <strong><code>cancel_pkt</code> is never called in this path.</strong>
+          <code>vsock_loopback_cancel_pkt()</code> (which calls <code>virtio_transport_purge_skbs()</code>
+          to drain the pkt_queue) is only invoked from <code>vsock_connect_timeout</code> and
+          <code>vsock_shutdown</code> — not from <code>__vsock_release</code>. SKBs in the loopback
+          queue survive the close path unaffected.
+        </p>
+
+        <h3 id="s7">The Race Window</h3>
+        <p>
+          On a single-CPU QEMU instance (the kernelCTF environment), scheduling is cooperative between
+          kernel threads. The loopback workqueue (<em>vsock-loopback</em>, created with flags=0) runs as a
+          bounded workqueue worker. After <code>close(fd)</code>, the kernel returns to userspace briefly
+          — during which <code>sched_yield()</code> or natural scheduling causes the workqueue worker to
+          run before the delayed close work fires.
+        </p>
+        <pre class="danger"><span class="cm">/* Timeline confirmed via GDB */</span>
+[user] send(fd, buf, 8192, MSG_DONTWAIT)  <span class="cm">/* × 6 — SKBs queued in pkt_queue */</span>
+[user] close(fd)                          <span class="cm">/* virtio_transport_close() → schedules 8s work */</span>
+                                          <span class="cm">/*   vvs still ALIVE at this point              */</span>
+[wq]   vsock_loopback_work() wakes up
+[wq]     consume_skb_sent(skb, false)
+[wq]       s   = skb->sk           <span class="cm">/* UAF READ  — sk still valid, refcount=0 */</span>
+[wq]       vvs = vs->trans         <span class="cm">/* vvs pointer — still live               */</span>
+[wq]       vvs->bytes_unsent -= 8192  <span class="cm">/* WRITE on live-but-closing vvs          */</span>
+[wq]     deliver pkt to receiver
+[8s]   virtio_transport_close_timeout()
+[8s]     virtio_transport_do_close()
+[8s]     kfree(vvs)                <span class="cm">/* ← freed HERE, not at close() time      */</span></pre>
+
+        <div class="callout callout-warn">
+          <div class="callout-title">Key Finding — Write Happens on Live Object</div>
+          On the tested single-CPU configuration, the UAF write to <code>bytes_unsent</code> consistently
+          occurs on a <em>live but refcount=0</em> vvs, not a freed one. <code>kfree(vvs)</code> happens
+          8 seconds later (slow path) or immediately (fast path if peer already shut down).
+          Forcing the fast path and reversing the ordering to achieve a true cross-cache write is
+          the open exploitation challenge — detailed in §5.
+        </div>
+      </section>
+
+      <!-- 4. CONFIRMATION -->
+      <section id="s8">
+        <div class="section-num">§ 04</div>
+        <h2>Confirmation via GDB</h2>
+
+        <h3 id="s9">Hardware Watchpoint Strategy</h3>
+        <p>
+          We confirmed the bug using a live GDB session attached to the QEMU kernel via
+          <code>-s -S</code> flags. The strategy: break on <code>virtio_transport_consume_skb_sent</code>,
+          detect the UAF condition via <code>sk-&gt;__sk_common.skc_refcnt.refs.counter == 0</code>,
+          then arm a hardware watchpoint on the identified <code>vvs+0x20</code>.
+        </p>
+        <pre><span class="cm"># GDB script — UAF detection and watchpoint</span>
+<span class="kw">break</span> virtio_transport_consume_skb_sent
+commands
+  silent
+  <span class="kw">set</span> $sk  = skb->sk
+  <span class="kw">set</span> $ref = ((struct sock*)$sk)->__sk_common.skc_refcnt.refs.counter
+  <span class="kw">set</span> $vvs = ((struct vsock_sock*)$sk)->trans
+  <span class="kw">set</span> $len = skb->len
+  <span class="kw">if</span> $len > 0 && $ref == 0
+    <span class="kw">set</span> $last_uaf_vvs = $vvs
+    printf <span class="st">"*** UAF HIT vvs=%p len=%d ***\n"</span>, $vvs, $len
+    printf <span class="st">"offset32 = 0x%lx\n"</span>, *(size_t*)((char*)$vvs + 0x20)
+  end
+  continue
+end
+
+<span class="kw">break</span> virtio_transport_destruct
+commands
+  silent
+  <span class="kw">set</span> $vvs_d = ((struct vsock_sock*)$rdi)->trans
+  <span class="kw">if</span> $target_vvs == 0 && $vvs_d == $last_uaf_vvs
+    <span class="kw">set</span> $target_vvs = $vvs_d
+    printf <span class="st">"FREED vvs=%p — watchpoint armed\n"</span>, $target_vvs
+    watch *(size_t*)((char*)$target_vvs + 0x20)
+  end
+  continue
+end</pre>
+
+        <h3>GDB Output — UAF Write Confirmed</h3>
+        <pre class="confirm">*** UAF HIT vvs=0xffff88800b80a400 len=8192 ***
+offset8  = 0x0   <span class="ok">← m_list-style field = 0, safe for spinlock</span>
+offset32 = 0x2000  <span class="ok">← bytes_unsent BEFORE decrement</span>
+
+AFTER write:
+offset32 = 0x0   <span class="ok">← bytes_unsent -= 8192 (0x2000 → 0x0) ✓</span>
+
+FREED vvs=0xffff88800b80a400 — watchpoint armed
+Memory at freed slot:
+0xffff88800b80a400:  0xffff888009d16c00  0x0000000000000000
+0xffff88800b80a410:  0x000000000000c001  0x0000000000040000
+0xffff88800b80a420:  0x0000000000000000  0x0000000000000000</pre>
+
+        <div class="callout callout-confirm">
+          <div class="callout-title">Confirmed Findings</div>
+          <strong>(1)</strong> The UAF write fires reliably — <code>bytes_unsent</code> decremented by exactly
+          <code>skb-&gt;len</code> = 8192, multiple times per connection (once per SKB in flight).<br><br>
+          <strong>(2)</strong> KASAN does not fire. The object is technically alive (refcount=0 but not yet
+          freed) at write time — KASAN only instruments <code>kfree()</code>-ed memory, not refcount=0 objects.<br><br>
+          <strong>(3)</strong> After <code>kfree(vvs)</code> (via <code>virtio_transport_destruct</code>),
+          the freed slot's first 8 bytes contain a SLUB freelist pointer —
+          confirming it entered the kmalloc-96 free list and is available for reclaim.
+        </div>
+
+        <h3>UAF Read — Kernel Pointer Leak</h3>
+        <p>
+          At the point <code>consume_skb_sent</code> dereferences <code>skb-&gt;sk</code>, the <code>sock</code>
+          structure is being torn down with <code>refcount=0</code>. GDB inspection of adjacent fields
+          revealed live kernel text and data pointers:
+        </p>
+        <pre><span class="cm">/* sk at time of UAF read */</span>
+sk+0x28: 0xffffffff88dc23e0   <span class="cm">/* sk_prot  — kernel text pointer (.text) */</span>
+sk+0x30: 0xffffffff8a40b700   <span class="cm">/* sk_net   — kernel data pointer (.data) */</span></pre>
+        <p>
+          If these values can be exfiltrated to userspace, they provide a <strong>direct KASLR bypass</strong>
+          without needing any cross-cache technique. The sk_prot pointer is a fixed offset from the kernel
+          base; subtracting the known compile-time offset yields <code>_text</code>.
+        </p>
+
+        <h3>Spray Landing — add_key Confirmation</h3>
+        <p>
+          To confirm that the freed vvs slot is reclaimable, we sprayed 512 <code>add_key("user", ...)</code>
+          calls with 72-byte payloads (→ kmalloc-96) immediately after <code>kfree(vvs)</code>.
+          GDB watchpoint confirmed the marker value landing:
+        </p>
+        <pre class="confirm">Hardware watchpoint: *(size_t*)((char*)$target_vvs + 0x20)
+Old value = 0
+New value = <span class="ok">3501   ← 0xdad — spray marker confirmed in freed slot ✓</span>
+
+Old value = 3501
+New value = 0    <span class="bad">← kvfree_sensitive() zeroes temp payload buffer ✗</span></pre>
+        <p>
+          The marker confirmed cache alignment: the <code>add_key</code> temporary payload buffer
+          lands in kmalloc-96, matching the freed vvs. However, <code>kvfree_sensitive()</code> at the
+          end of the <code>add_key</code> syscall zeroes and frees the temporary buffer — it is not the
+          persistent <code>user_key_payload</code> object. This drove the requirement to switch spray
+          objects.
+        </p>
+      </section>
+
+      <!-- 5. EXPLOITATION -->
+      <section id="s10">
+        <div class="section-num">§ 05</div>
+        <h2>Exploitation Primitives &amp; Constraints</h2>
+
+        <h3 id="s11">Spray Object Analysis</h3>
+        <p>
+          To convert the UAF write into a useful exploit primitive, a spray object must satisfy:
+        </p>
+        <table>
+          <tr><th>Requirement</th><th>Reason</th></tr>
+          <tr><td>Allocated in kmalloc-96</td><td>Must land in same slab cache as freed vvs (size ≈ 80 → kmalloc-96)</td></tr>
+          <tr><td>Not zeroed on free/alloc</td><td>Value at +0x20 must persist after UAF write</td></tr>
+          <tr><td>Offset +0x20 readable/controlled</td><td>UAF write target is fixed at bytes_unsent = vvs+0x20</td></tr>
+          <tr><td>No spinlock at +0x00</td><td>consume_skb_sent calls spin_lock_bh(&vvs->tx_lock) — tx_lock is at +0x18; +0x00 is rx_lock</td></tr>
+          <tr><td>Stays alive after allocation</td><td>spray → workqueue runs → UAF write → read back = three separate points in time</td></tr>
+        </table>
+
+        <h3>Candidate Objects</h3>
+
+        <p><strong>add_key temporary payload buffer</strong> — eliminated. <code>kvfree_sensitive()</code>
+        zeroes it at end of syscall. Confirmed by GDB watchpoint.</p>
+
+        <p><strong>user_key_payload</strong> — viable in principle. Allocated as
+        <code>kmalloc(sizeof(struct user_key_payload) + datalen)</code> = <code>18 + datalen</code> bytes.
+        For kmalloc-96: <code>datalen = 78</code>. Persists in keyring until explicitly revoked.
+        Not zeroed on free. Readable via <code>keyctl(KEYCTL_READ)</code>. <strong>Problem:</strong> the
+        temporary payload copy (also kmalloc(78) → kmalloc-96) competes for the same freed slot and
+        is zeroed first.</p>
+
+        <p><strong>msg_msg</strong> — the canonical technique (Popov et al.). Size: <code>0x30 header + 48 bytes data = 96</code> → kmalloc-96.
+        Persistent in message queue. <code>msg_msg.next</code> at +0x20 — the exact write target.
+        Normally NULL for short messages; UAF decrement corrupts it to
+        <code>0 - 8192 = 0xffffffffffffe000</code>.
+        Following this in <code>msgrcv()</code> → OOB kernel read → KASLR bypass.
+        <strong>Problem with this kernel:</strong> <code>init_on_alloc=0</code> — fresh msg_msg allocations
+        have stale data at +0x00 (m_list fields), making the spinlock at
+        <code>spin_lock_bh(&vvs->tx_lock)</code> potentially hang or crash.</p>
+
+        <pre><span class="cm">/* msg_msg layout — kmalloc-96 */</span>
+<span class="kw">struct</span> <span class="ty">msg_msg</span> {
+    <span class="kw">struct</span> list_head m_list;     <span class="cm">/* +0x00: 16 bytes — contains fwd/bck ptrs */</span>
+    <span class="ty">long</span>             m_type;     <span class="cm">/* +0x10 */</span>
+    <span class="ty">size_t</span>           m_ts;       <span class="cm">/* +0x18 */</span>
+    <span class="kw">struct</span> msg_msgseg *next;     <span class="cm">/* +0x20 ← UAF WRITE LANDS HERE */</span>
+    <span class="kw">void</span>             *security;  <span class="cm">/* +0x28 */</span>
+};                               <span class="cm">/* data follows at +0x30 */</span></pre>
+
+        <h3 id="s12">The Ordering Problem — Root Cause</h3>
+        <p>
+          The fundamental constraint is execution ordering on a single-CPU system. Our confirmed
+          observation is that <code>consume_skb_sent</code> always fires on the <em>live</em> vvs
+          (before <code>kfree</code>). For a cross-cache UAF write, we need:
+        </p>
+        <pre class="danger"><span class="cm">/* DESIRED ordering — cross-cache UAF */</span>
+[1] spray: msg_msg / user_key_payload allocated → blocked in msgsnd
+[2] close(fd) → kfree(vvs) IMMEDIATELY (fast path)
+[3] spray object reclaims freed vvs slot
+[4] vsock_loopback_work runs → consume_skb_sent
+    → vvs->bytes_unsent -= 8192
+    → ACTUALLY hits msg_msg.next -= 8192   <span class="ok">← cross-cache write ✓</span>
+
+<span class="cm">/* ACTUAL ordering observed */</span>
+[1] close(fd) → virtio_transport_close() → schedules 8s work (slow path)
+[2] vsock_loopback_work runs → consume_skb_sent (write on LIVE vvs)
+[3] [8 seconds later] kfree(vvs)
+[4] spray → reclaims freed slot (too late, write already done)</pre>
+
+        <p>
+          <strong>Fast path analysis:</strong> <code>virtio_transport_close()</code> takes the fast path
+          (immediate teardown, no 8s delay) only when
+          <code>vsk-&gt;peer_shutdown == SHUTDOWN_MASK</code> at the time of <code>close(fd)</code>.
+          The peer's shutdown packet arrives via the <em>same</em> loopback workqueue as the data SKBs.
+          The workqueue processes them in FIFO order — data SKBs first (sent before listener closed),
+          shutdown packet second. By the time <code>peer_shutdown == SHUTDOWN_MASK</code> is set on the
+          sender, <code>consume_skb_sent</code> has already run for all data SKBs.
+        </p>
+        <p>
+          This is the core catch-22: you cannot get <code>peer_shutdown</code> set without the workqueue
+          running, and the workqueue running means <code>consume_skb_sent</code> has already fired on
+          the live vvs. Reversing this ordering requires either a multi-CPU environment (workqueue
+          deferred to a different CPU), a way to hold the workqueue (flush/cancel from userspace has
+          no syscall interface), or a different trigger mechanism entirely.
+        </p>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Current Primitive Summary</div>
+          <strong>Confirmed:</strong> Reliable controlled subtraction (<code>-= skb-&gt;len</code>) on
+          <code>vvs-&gt;bytes_unsent</code> at <code>vvs+0x20</code>, firing once per SKB in flight
+          (typically 6 writes per connection attempt), KASAN-silent, repeatable.<br><br>
+          <strong>Blocked:</strong> Cross-cache write (into spray object) requires forcing
+          <code>kfree(vvs)</code> before workqueue runs — not achievable on single-CPU QEMU with the
+          current trigger sequence.<br><br>
+          <strong>Strongest path forward:</strong> Exfiltrate the UAF-read kernel pointers
+          (<code>sk_prot</code>, <code>sk_net</code>) to userspace via a receiver-side socket operation —
+          yielding KASLR bypass without needing the cross-cache step.
+        </div>
+      </section>
+
+      <!-- 6. AI PIPELINE -->
+      <section id="s13">
+        <div class="section-num">§ 06</div>
+        <h2>AI-Augmented Research Pipeline</h2>
+
+        <p>
+          This research was conducted using an <strong>extended AI collaboration pipeline</strong> in which
+          a large language model served as an active technical co-researcher throughout the entire process —
+          from source reading and hypothesis formation, through GDB script generation, PoC development,
+          and exploit primitive analysis. We document this methodology in detail because it represents
+          a novel and reproducible approach to kernel vulnerability research.
+        </p>
+
+        <h3>Pipeline Architecture</h3>
+        <p>
+          The workflow was entirely human-directed: the researcher controlled all decisions about what
+          to investigate, what to run, and what the evidence meant. The AI operated as a <strong>stateful
+          technical assistant</strong> with continuous access to source code, GDB output, and PoC results
+          shared iteratively across the session. The model was never given root access, never ran code,
+          and never made independent decisions — it reasoned, proposed, and explained.
+        </p>
+        <p>
+          Key capabilities leveraged from the model:
+        </p>
+        <table>
+          <tr><th>Task</th><th>AI Contribution</th><th>Human Role</th></tr>
+          <tr><td>Source code reading</td><td>Traced call graphs across 5 files simultaneously, identified the missing cancel_pkt call in __vsock_release</td><td>Directed which subsystem to focus on</td></tr>
+          <tr><td>Struct layout</td><td>Computed field offsets for virtio_vsock_sock, msg_msg, user_key_payload from source</td><td>Verified against /proc/kcore and GDB</td></tr>
+          <tr><td>GDB scripts</td><td>Generated conditional breakpoint scripts with hardware watchpoints, refcount checks, and before/after logging</td><td>Executed on live kernel, reported output</td></tr>
+          <tr><td>PoC code</td><td>Wrote and iteratively refined the C exploit across 8+ versions based on GDB feedback</td><td>Compiled, ran, and reported results</td></tr>
+          <tr><td>Primitive analysis</td><td>Identified kvfree_sensitive as the blocker, computed correct spray sizes, analyzed ordering constraint</td><td>Confirmed or refuted each hypothesis with evidence</td></tr>
+          <tr><td>Spray object selection</td><td>Analyzed msg_msg, user_key_payload, pipe_buffer, add_key payload — computed kmalloc size for each</td><td>Tested each candidate</td></tr>
+        </table>
+
+        <h3>The Iterative Feedback Loop</h3>
+        <p>
+          Each research iteration followed a tight cycle: the researcher shared GDB output or PoC
+          results as raw text; the AI read the output precisely (e.g., identifying that
+          <code>vvs=0xffff88800dbc5f00</code> in the watchpoint and <code>vvs=0xffff88800dbc5f00</code>
+          in <code>get_credit</code> were the <em>same address</em>, meaning the freed slot was
+          reclaimed by a new socket rather than by the spray), then issued a precise diagnosis and
+          corrected the next PoC version.
+        </p>
+        <p>
+          The most significant example: after the listener thread interference was identified as
+          stealing the freed slab slot (a new <code>vsock_create_connected()</code> call reclaiming
+          the freed vvs address), the AI proposed stopping the listener before freeing — which led
+          to discovering that the volatile flag approach fails because <code>accept()</code> is a
+          blocking syscall that doesn't check flags. This drove the exploration of the fast-path
+          ordering problem, which ultimately defined the open research question.
+        </p>
+
+        <h3>What the AI Could Not Do</h3>
+        <p>
+          The model's limitations were equally instructive. It could not independently verify kernel
+          addresses, could not run GDB, and had no direct access to the target system. When it
+          proposed that the watchpoint was firing on the wrong vvs, that was a hypothesis — the
+          researcher confirmed it by checking addresses. More subtly: the model initially suggested
+          <code>recv()</code> before <code>close()</code> as a fast-path trigger, but careful
+          source tracing revealed this cannot work — the workqueue delivers both the data SKBs
+          <em>and</em> the peer's shutdown packet in the same run, defeating the ordering.
+          The researcher's empirical GDB observations were the ground truth throughout.
+        </p>
+
+        <h3>Methodological Takeaways</h3>
+        <p>
+          Using an AI pipeline for kernel research introduces a fundamentally different workflow
+          compared to manual analysis. Instead of a single researcher holding an entire call graph
+          in their head, the model maintains working context across multiple files simultaneously —
+          reading <code>af_vsock.c</code>, <code>virtio_transport_common.c</code>, and
+          <code>vsock_loopback.c</code> in parallel and cross-referencing them on demand.
+          This dramatically accelerates the hypothesis generation phase.
+        </p>
+        <p>
+          However, the pipeline succeeds precisely because the human researcher maintains
+          <strong>epistemic control</strong>: every hypothesis is tested empirically, every GDB output
+          is shared in full, and the researcher exercises judgment about which direction to pursue.
+          The model serves as a force multiplier for the researcher's expertise — it does not
+          replace the expertise itself. Kernel exploitation requires deep intuition about race
+          conditions, slab allocator behavior, and workqueue scheduling that the model approximates
+          from training but cannot truly verify without live system access.
+        </p>
+      </section>
+
+      <!-- 7. WHAT WE LEARNED -->
+      <section id="s14">
+        <div class="section-num">§ 07</div>
+        <h2>What We Learned About the Kernel</h2>
+
+        <h3>Socket Lifecycle is Non-Trivial</h3>
+        <p>
+          The gap between <code>close(fd)</code> and <code>kfree(vvs)</code> can be up to 8 seconds
+          in the slow path. <code>VSOCK_CLOSE_TIMEOUT = 8 * HZ</code> is a protocol-level timeout,
+          not a cleanup shortcut. During this window, the socket structure is unreferenced but not freed —
+          a class of bugs distinct from classic UAF where the object is freed at syscall return time.
+        </p>
+
+        <h3>SKB Back-Pointers Are Not Reference-Counted</h3>
+        <p>
+          <code>skb-&gt;sk</code> is set in <code>virtio_transport_alloc_skb()</code> via
+          <code>skb_set_owner_w()</code>, which takes a refcount on the socket. However, in the loopback
+          path, <code>consume_skb_sent(skb, false)</code> does not consume the SKB (the receiver does) —
+          and the refcount is released by <code>sock_wfree</code> (the SKB destructor) only when the SKB
+          is finally freed by the receiver. The window between socket teardown and SKB freeing is the
+          entire vulnerability surface.
+        </p>
+
+        <h3>SLUB Cache Behavior</h3>
+        <p>
+          The kmalloc-96 cache is shared across many subsystems. Freed objects are immediately returned
+          to the per-CPU slab and available for reallocation by any <code>kmalloc(96, GFP_KERNEL)</code>
+          call. With <code>CONFIG_INIT_ON_ALLOC_DEFAULT_ON=n</code>, freshly allocated objects carry
+          stale data — eliminating one of the standard Popov-style msg_msg spray assumptions (that
+          <code>m_list</code> fields are zero immediately post-allocation).
+        </p>
+
+        <h3>Workqueue Scheduling on Single-CPU QEMU</h3>
+        <p>
+          Bounded workqueues (flags=0) run on worker threads that are scheduled by the CFS scheduler.
+          On a single-CPU system, a workqueue worker and a userspace thread cannot run simultaneously.
+          After <code>close(fd)</code>, the kernel processes the syscall return, re-enters userspace,
+          and only then does the scheduler select the workqueue worker. <code>sched_yield()</code>
+          explicitly hands control to the worker. This determinism — while frustrating for ordering
+          attacks — actually makes the UAF more reliably reproducible than on SMP systems.
+        </p>
+
+        <h3>cancel_pkt as a Missing Safety Net</h3>
+        <p>
+          The loopback transport's <code>cancel_pkt</code> implementation correctly calls
+          <code>virtio_transport_purge_skbs()</code> to drain in-flight SKBs. The bug is that this
+          is never called during normal socket close — only during connection timeout and explicit
+          shutdown. A minimal fix would be to call <code>transport-&gt;cancel_pkt(vsk)</code>
+          inside <code>__vsock_release()</code> before invoking <code>transport-&gt;release(vsk)</code>,
+          ensuring no SKBs remain in the loopback queue with a back-pointer to the socket being torn down.
+        </p>
+      </section>
+
+      <!-- 8. CONCLUSION -->
+      <section id="s15">
+        <div class="section-num">§ 08</div>
+        <h2>Conclusion</h2>
+        <p>
+          We identified, confirmed, and deeply analyzed a use-after-free vulnerability in the Linux
+          kernel's vsock loopback transport (<code>net/vmw_vsock/virtio_transport_common.c</code>,
+          <code>virtio_transport_consume_skb_sent()</code>), present in kernel 6.12.x.
+        </p>
+        <p>
+          The bug yields a <strong>KASAN-silent, controlled, repeatable write primitive</strong> on
+          a kernel object at a known offset, alongside a <strong>UAF read</strong> of kernel text and
+          data pointers from a refcount=0 socket structure. The fundamental exploitation challenge —
+          reversing the ordering so the cross-cache write fires into a spray object rather than a live vvs —
+          is an open problem constrained by the single-CPU workqueue scheduling behavior and the
+          absence of a userspace-accessible mechanism to defer or cancel the loopback workqueue.
+        </p>
+        <p>
+          The research demonstrates that AI-augmented kernel analysis is a practically viable and
+          powerful methodology, capable of identifying, tracing, and characterizing complex
+          multi-file kernel race conditions at a depth and speed that significantly exceeds purely
+          manual analysis — provided the human researcher maintains empirical control and treats
+          every model-generated hypothesis as a testable claim rather than a fact.
+        </p>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Responsible Disclosure</div>
+          This research was conducted as part of kernelCTF, a competition specifically designed
+          for kernel vulnerability research. Findings were handled in accordance with the
+          kernelCTF disclosure process. No production systems were targeted. All experiments were
+          performed in isolated QEMU virtual machine environments.
+        </div>
+
+        <hr class="divider">
+
+        <h3>Affected Versions</h3>
+        <table>
+          <tr><th>Component</th><th>Value</th></tr>
+          <tr><td>Kernel</td><td>Linux 6.12.x (kernelCTF target)</td></tr>
+          <tr><td>Subsystem</td><td>net/vmw_vsock</td></tr>
+          <tr><td>Files</td><td>virtio_transport_common.c, vsock_loopback.c, af_vsock.c</td></tr>
+          <tr><td>Function</td><td>virtio_transport_consume_skb_sent()</td></tr>
+          <tr><td>Slab cache</td><td>kmalloc-96</td></tr>
+          <tr><td>KASAN</td><td>Not triggered (refcount=0, not kfree'd at write time)</td></tr>
+          <tr><td>CONFIG guard</td><td>CONFIG_VSOCKETS + CONFIG_VIRTIO_VSOCKETS required</td></tr>
+        </table>
+      </section>
+
+    </main>
+  </div><!-- /layout -->
+
+  <footer>
+    <span>Linux vsock UAF — Technical Research Writeup</span>
+    <span>kernel 6.12.x · net/vmw_vsock · AI-Augmented Research</span>
+  </footer>
+
+</div><!-- /wrap -->
+</body>
+</html>
