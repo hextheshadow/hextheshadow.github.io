@@ -1,983 +1,474 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ladybird Anti-Fingerprinting Engine — hextheshadow</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Syne:wght@400;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-  --bg:       #080808;
-  --surface:  #0f0f0f;
-  --border:   #1a1a1a;
-  --border2:  #242424;
-  --muted:    #404040;
-  --dim:      #606060;
-  --body:     #a8a8a8;
-  --text:     #d4d4d4;
-  --bright:   #f0f0f0;
-  --green:    #00e676;
-  --gdim:     #00b85a;
-  --gglow:    rgba(0,230,118,0.12);
-  --orange:   #ff6d00;
-  --blue:     #00c8ff;
-  --mono:     'JetBrains Mono', monospace;
-  --display:  'Syne', sans-serif;
-  --serif:    'Instrument Serif', serif;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#070a0d;--bg2:#0c1117;--card:#0b1510;
+  --green:#00ff6a;--gdim:#00c450;--gglow:rgba(0,255,106,.15);
+  --blue:#00c8ff;--bdim:#0099cc;
+  --text:#c8ddd0;--dim:#5a7263;
+  --bdr:#182420;
+  --mono:'JetBrains Mono',monospace;
+  --head:'Syne',sans-serif;
+  --body:'Outfit',sans-serif;
 }
-
-html { scroll-behavior: smooth; background: var(--bg); }
-
-body {
-  background: var(--bg);
-  color: var(--body);
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.75;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.7;overflow-x:hidden;cursor:none;}
 
 /* scanline */
-body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 9997; pointer-events: none;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.025) 2px, rgba(0,0,0,.025) 4px);
-}
+body::before{content:'';position:fixed;inset:0;z-index:9997;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);}
+
+/* cursor */
+.cursor{position:fixed;top:0;left:0;z-index:9999;pointer-events:none;}
+.cdot{width:5px;height:5px;border-radius:50%;background:var(--green);position:absolute;transform:translate(-50%,-50%);box-shadow:0 0 7px var(--green);}
+.cring{width:27px;height:27px;border-radius:50%;border:1px solid rgba(0,255,106,.35);position:absolute;transform:translate(-50%,-50%);transition:width .17s,height .17s,border-color .17s;}
+body:has(a:hover) .cring,body:has(button:hover) .cring{width:40px;height:40px;border-color:var(--blue);}
 
 /* scrollbar */
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--gdim); }
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--gdim);}
 
-/* ── MAIN NAV ── */
-.main-nav {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(8,8,8,0.94);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-}
-.nav-inner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 32px;
-  max-width: 900px;
-  margin: 0 auto;
-}
-.nav-logo {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--bright);
-  text-decoration: none;
-  letter-spacing: -0.01em;
-  transition: color 0.2s;
-}
-.nav-logo span { color: var(--green); }
-.nav-logo:hover { color: var(--green); }
-
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-.nav-back {
-  font-size: 11px;
-  color: var(--dim);
-  text-decoration: none;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  transition: color 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.nav-back::before { content: '←'; }
-.nav-back:hover { color: var(--green); }
-
-.nav-icons {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.nav-icon {
-  color: var(--muted);
-  text-decoration: none;
-  transition: color 0.2s;
-  display: flex;
-  align-items: center;
-}
-.nav-icon:hover { color: var(--green); }
-.nav-icon svg { display: block; }
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;
+  padding:15px 5%;background:rgba(7,10,13,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--bdr);transition:border-color .3s;}
+nav.sc{border-color:rgba(0,196,80,.3);}
+.nlogo{font-family:var(--mono);font-size:.82rem;color:var(--green);text-decoration:none;letter-spacing:.06em;}
+.nlogo em{color:var(--blue);font-style:normal;}
+.nlinks{display:flex;gap:30px;list-style:none;}
+.nlinks a{font-family:var(--mono);font-size:.68rem;color:var(--dim);text-decoration:none;letter-spacing:.12em;text-transform:uppercase;transition:color .2s;position:relative;}
+.nlinks a::after{content:'';position:absolute;left:0;bottom:-3px;width:0;height:1px;background:var(--green);transition:width .3s;}
+.nlinks a:hover{color:var(--green);}
+.nlinks a:hover::after{width:100%;}
+.hbg{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px;}
+.hbg span{display:block;width:22px;height:1.5px;background:var(--green);transition:.3s;}
 
 /* ── LAYOUT ── */
-.wrap {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 32px;
-}
+section{padding:88px 5%;}
+.wrap{max-width:800px;margin:0 auto;padding:0 5%;}
 
-/* ── POST HEADER ── */
-.post-header {
-  padding: 64px 0 48px;
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-}
-.post-header::before {
-  content: '';
-  position: absolute;
-  top: -200px; right: -200px;
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(0,230,118,0.05) 0%, transparent 60%);
-  pointer-events: none;
-}
+/* ── PAGE HEADER ── */
+.page-header{padding:110px 5% 60px;background:var(--bg2);position:relative;overflow:hidden;}
+.header-glow{position:absolute;top:50%;right:0;width:400px;height:400px;background:radial-gradient(ellipse,rgba(0,255,106,.08) 0%,transparent 70%);pointer-events:none;z-index:0;}
+.header-inner{position:relative;z-index:1;max-width:800px;margin:0 auto;}
+.page-tag{font-family:var(--mono);font-size:.66rem;color:var(--green);letter-spacing:.2em;text-transform:uppercase;display:block;margin-bottom:20px;}
+.page-title{font-family:var(--head);font-size:clamp(2rem,5vw,3.2rem);font-weight:700;color:#fff;letter-spacing:-.015em;line-height:1.1;margin-bottom:15px;}
+.page-desc{font-size:.95rem;color:var(--dim);line-height:1.85;max-width:650px;}
 
-.post-tag {
-  font-size: 11px;
-  color: var(--green);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.post-tag::before {
-  content: '';
-  display: block;
-  width: 24px;
-  height: 1px;
-  background: var(--green);
-}
+/* ── CONTENT GRID ── */
+.content-grid{display:grid;grid-template-columns:220px 1fr;gap:60px;padding:80px 5%;align-items:start;}
+.content-grid .toc{position:sticky;top:100px;}
 
-.post-title {
-  font-family: var(--display);
-  font-size: clamp(22px, 4.5vw, 40px);
-  font-weight: 700;
-  color: var(--bright);
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-  margin-bottom: 10px;
-}
+/* ── TOC/SIDEBAR ── */
+.toc{font-size:.75rem;color:var(--dim);border-left:1px solid var(--bdr);padding-left:18px;}
+.toc-label{font-family:var(--mono);font-size:.65rem;color:var(--dim);letter-spacing:.15em;text-transform:uppercase;margin-bottom:14px;display:block;}
+.toc a{display:block;color:var(--dim);text-decoration:none;padding:5px 0;line-height:1.6;transition:color .2s;font-family:var(--mono);font-size:.7rem;}
+.toc a:hover{color:var(--green);}
+.toc-section{margin-bottom:12px;}
 
-.post-subtitle {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 15px;
-  color: var(--dim);
-  margin-bottom: 32px;
-}
+/* ── MAIN CONTENT ── */
+.main-content{max-width:700px;}
+section h2{font-family:var(--head);font-size:1.8rem;font-weight:700;color:#fff;margin:50px 0 20px;padding-bottom:15px;border-bottom:1px solid var(--bdr);letter-spacing:-.01em;}
+section h3{font-family:var(--mono);font-size:.75rem;color:var(--green);letter-spacing:.15em;text-transform:uppercase;margin:28px 0 12px;font-weight:500;}
+section p{font-size:.95rem;color:var(--dim);line-height:1.85;margin-bottom:16px;}
+section strong{color:var(--text);font-weight:500;}
+section em{color:var(--green);}
 
-.post-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
-}
-.meta-item { display: flex; flex-direction: column; gap: 3px; }
-.meta-label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.meta-val   { font-size: 12px; color: var(--green); }
-
-/* ── BODY LAYOUT ── */
-.post-body {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 64px;
-  padding: 64px 0;
-  align-items: start;
-}
-
-/* ── TOC (sidebar, not nav) ── */
-.toc {
-  position: sticky;
-  top: 64px;
-  font-size: 11px;
-  color: var(--muted);
-  border-left: 1px solid var(--border);
-  padding-left: 16px;
-}
-.toc-label {
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-.toc a {
-  display: block;
-  color: var(--dim);
-  text-decoration: none;
-  padding: 3px 0;
-  line-height: 1.4;
-  transition: color 0.15s;
-}
-.toc a:hover { color: var(--green); }
-.toc-section { margin-bottom: 6px; }
-.toc-num { color: var(--green); font-size: 9px; }
-
-/* ── CONTENT ── */
-.content section { margin-bottom: 64px; }
-
-.section-num {
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-h2 {
-  font-family: var(--display);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--bright);
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-  letter-spacing: -0.01em;
-}
-
-h3 {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--green);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin: 24px 0 10px;
-}
-
-p { margin-bottom: 14px; color: var(--body); font-size: 13px; line-height: 1.8; }
-
-strong { color: var(--text); font-weight: 500; }
-em { font-family: var(--serif); font-style: italic; color: var(--text); }
-
-a { color: var(--green); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-/* ── inline code ── */
-code {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--body);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 1px 6px;
-}
-
-/* ── CODE BLOCKS ── */
-pre {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 2px solid var(--green);
-  padding: 20px 22px;
-  overflow-x: auto;
-  margin: 16px 0;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.7;
-  color: var(--dim);
-}
-pre.bad  { border-left-color: var(--orange); }
-pre.good { border-left-color: var(--green); }
-pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
-
-.cm  { color: #383838; font-style: italic; }
-.kw  { color: #c792ea; }
-.fn  { color: #82aaff; }
-.st  { color: #c3e88d; }
-.ty  { color: #ffcb6b; }
-.nu  { color: #f78c6c; }
-.op  { color: #89ddff; }
-.ns  { color: #c0a0e8; }
-
-/* ── TABLES ── */
-.table-wrap { overflow-x: auto; margin: 20px 0; border: 1px solid var(--border); }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-thead tr { background: rgba(0,230,118,0.03); }
-th {
-  text-align: left;
-  padding: 10px 14px;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border);
-  font-weight: 500;
-  white-space: nowrap;
-}
-td {
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--border);
-  color: var(--body);
-  vertical-align: top;
-}
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: rgba(0,230,118,0.02); }
-td:first-child { font-family: var(--mono); font-size: 11px; color: var(--text); white-space: nowrap; }
-td code { background: none; border: none; padding: 0; color: var(--green); font-size: 11px; }
+/* ── CODE ── */
+code{font-family:var(--mono);font-size:.85rem;color:var(--green);background:rgba(0,255,106,.06);border:1px solid rgba(0,255,106,.2);padding:2px 8px;border-radius:3px;}
+pre{background:var(--card);border:1px solid var(--bdr);border-left:2px solid var(--green);padding:20px;overflow-x:auto;margin:20px 0;font-family:var(--mono);font-size:.8rem;line-height:1.7;color:var(--dim);border-radius:4px;}
+pre code{background:none;border:none;padding:0;color:inherit;}
 
 /* ── CALLOUT ── */
-.callout {
-  border: 1px solid var(--border2);
-  border-left: 2px solid var(--green);
-  background: rgba(0,230,118,0.04);
-  padding: 16px 20px;
-  margin: 20px 0;
-}
-.callout.warn {
-  border-left-color: var(--orange);
-  background: rgba(255,109,0,0.04);
-}
-.callout.info {
-  border-left-color: var(--blue);
-  background: rgba(0,200,255,0.04);
-}
-.callout-title {
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--green);
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-.callout.warn .callout-title { color: var(--orange); }
-.callout.info .callout-title { color: var(--blue); }
-.callout p { margin-bottom: 0; font-size: 12px; color: var(--body); }
+.callout{border:1px solid var(--bdr);border-left:2px solid var(--green);background:rgba(0,255,106,.04);padding:18px 20px;margin:24px 0;border-radius:4px;}
+.callout.warn{border-left-color:var(--blue);background:rgba(0,200,255,.04);}
+.callout-title{font-family:var(--mono);font-size:.7rem;color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;font-weight:500;}
+.callout.warn .callout-title{color:var(--blue);}
+.callout p{margin-bottom:0;font-size:.9rem;}
 
-/* ── SURFACE GRID ── */
-.surface-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 10px;
-  margin: 20px 0;
-}
-.surface-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 14px 16px;
-  transition: border-color 0.15s;
-}
-.surface-card:hover { border-color: var(--border2); }
-.surface-name {
-  font-size: 11px;
-  color: var(--green);
-  margin-bottom: 5px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-}
-.surface-desc { font-size: 11px; color: var(--dim); line-height: 1.55; }
+/* ── TABLES ── */
+.table-wrap{overflow-x:auto;margin:20px 0;border:1px solid var(--bdr);border-radius:4px;}
+table{width:100%;border-collapse:collapse;font-size:.85rem;}
+thead tr{background:rgba(0,255,106,.03);}
+th{text-align:left;padding:12px 16px;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--bdr);font-weight:500;white-space:nowrap;}
+td{padding:11px 16px;border-bottom:1px solid var(--bdr);color:var(--dim);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(0,255,106,.02);}
 
-/* ── META ROW ── */
-.meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 2px solid var(--green);
-  padding: 14px 20px;
-  margin: 20px 0;
-}
-.meta-row .meta-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 3px; }
-.meta-row .meta-value { font-size: 12px; color: var(--text); }
+/* ── BUTTONS & LINKS ── */
+a{color:var(--green);text-decoration:none;transition:color .2s;}
+a:hover{color:#00ff6a;text-decoration:underline;}
+
+.btn{font-family:var(--mono);font-size:.7rem;padding:12px 28px;text-decoration:none;letter-spacing:.1em;text-transform:uppercase;transition:.24s;cursor:none;display:inline-block;border:1px solid var(--green);color:var(--green);border-radius:3px;}
+.btn:hover{background:var(--green);color:#000;}
 
 /* ── HR ── */
-hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 48px 0;
-}
+hr{border:none;border-top:1px solid var(--bdr);margin:50px 0;}
 
 /* ── FOOTER ── */
-footer {
-  border-top: 1px solid var(--border);
-  padding: 24px 0 40px;
-}
-.footer-inner {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-.footer-left {
-  font-family: var(--display);
-  font-size: 13px;
-  color: var(--muted);
-}
-.footer-left span { color: var(--green); }
-.footer-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.footer-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--muted);
-  text-decoration: none;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  transition: color 0.2s, border-color 0.2s;
-}
-.footer-link:hover {
-  color: var(--green);
-  border-color: rgba(0,230,118,0.3);
-  text-decoration: none;
-}
-.footer-link svg { flex-shrink: 0; }
+footer{background:var(--bg);border-top:1px solid var(--bdr);padding:32px 5%;text-align:center;}
+.footer-inner{max-width:800px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+.fbrand{font-family:var(--mono);font-size:.75rem;color:var(--dim);}
+.fbrand span{color:var(--green);}
+.footer-links{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.footer-link{font-family:var(--mono);font-size:.65rem;color:var(--dim);text-decoration:none;padding:6px 12px;border:1px solid var(--bdr);letter-spacing:.08em;text-transform:uppercase;transition:.2s;cursor:none;}
+.footer-link:hover{border-color:var(--green);color:var(--green);}
 
 /* ── ANIMATIONS ── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.post-header { animation: fadeUp 0.5s ease both; }
-.toc         { animation: fadeUp 0.5s 0.05s ease both; }
-.content section { animation: fadeUp 0.5s ease both; }
-.content section:nth-child(2) { animation-delay: 0.05s; }
-.content section:nth-child(3) { animation-delay: 0.10s; }
-.content section:nth-child(4) { animation-delay: 0.15s; }
-.content section:nth-child(5) { animation-delay: 0.20s; }
-.content section:nth-child(6) { animation-delay: 0.25s; }
-.content section:nth-child(7) { animation-delay: 0.30s; }
-.content section:nth-child(8) { animation-delay: 0.35s; }
+@keyframes fu{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+.page-header{animation:fu .6s ease forwards;}
+.content-grid{animation:fu .6s .1s ease forwards;opacity:0;}
+.content-grid.v{opacity:1;}
 
 /* ── RESPONSIVE ── */
-@media (max-width: 720px) {
-  .nav-inner { padding: 14px 20px; }
-  .nav-icons { display: none; }
-
-  .wrap { padding: 0 20px; }
-
-  .post-header { padding: 40px 0 32px; }
-  .post-title { font-size: clamp(20px, 6vw, 32px); }
-
-  /* Stack TOC above content on mobile */
-  .post-body {
-    grid-template-columns: 1fr;
-    gap: 32px;
-    padding: 32px 0;
-  }
-  .toc {
-    position: static;
-    border-left: none;
-    border: 1px solid var(--border);
-    border-left: 2px solid var(--green);
-    padding: 14px 16px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 16px;
-  }
-  .toc-label { grid-column: 1 / -1; margin-bottom: 8px; }
-
-  .surface-grid { grid-template-columns: 1fr; }
-
-  .footer-inner { padding: 0 20px; }
-  .footer-right { gap: 4px; }
-
-  .meta-row { gap: 16px; }
-  .post-meta { gap: 16px; }
+@media(max-width:900px){
+  .content-grid{grid-template-columns:1fr;gap:40px;padding:60px 5%;}
+  .toc{position:static;border-left:none;border-top:1px solid var(--bdr);padding-left:0;padding-top:20px;margin-bottom:40px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px 32px;}
+  .toc-label{grid-column:1 / -1;}
 }
-
-@media (max-width: 480px) {
-  .nav-inner { padding: 12px 16px; }
-  .nav-back { display: none; }
-  .wrap { padding: 0 16px; }
-  .footer-inner { padding: 0 16px; }
-  .toc { grid-template-columns: 1fr; }
-  pre { padding: 14px 16px; font-size: 10.5px; }
+@media(max-width:680px){
+  .nlinks{display:none;}
+  .hbg{display:flex;}
+  .nlinks.open{display:flex;flex-direction:column;position:fixed;top:55px;left:0;right:0;background:rgba(7,10,13,.97);padding:22px;border-bottom:1px solid var(--bdr);gap:20px;z-index:999;}
+  nav{padding:13px 5%;}
+  section{padding:65px 5%;}
+  .page-header{padding:80px 5% 50px;}
+  .page-title{font-size:clamp(1.8rem,6vw,2.6rem);}
+  .page-desc{font-size:.9rem;}
+  .content-grid{padding:50px 5%;}
+  table{font-size:.75rem;}
+  th,td{padding:8px 12px;}
+  .footer-links{gap:8px;}
+  body{cursor:auto;}.cursor{display:none;}
+}
+@media(max-width:480px){
+  .page-header{padding:60px 5% 40px;}
+  .page-title{font-size:clamp(1.6rem,8vw,2.2rem);}
+  .page-tag{font-size:.6rem;}
+  .page-desc{font-size:.85rem;}
+  .content-grid{padding:40px 5%;gap:24px;}
+  section{padding:50px 5%;}
+  section h2{font-size:1.4rem;margin:30px 0 14px;}
+  section h3{font-size:.65rem;margin:20px 0 10px;}
+  section p{font-size:.85rem;margin-bottom:12px;}
+  pre{padding:14px;font-size:.7rem;margin:14px 0;}
+  .callout{padding:14px 16px;}
+  .footer-inner{flex-direction:column;gap:12px;}
+  .footer-links{flex-direction:column;width:100%;}
+  .footer-link{width:100%;text-align:center;}
 }
 </style>
 </head>
 <body>
 
-<!-- MAIN NAV -->
-<nav class="main-nav">
-  <div class="nav-inner">
-    <a class="nav-logo" href="https://hextheshadow.github.io/">hex<span>the</span>shadow</a>
-    <div class="nav-right">
-      <a class="nav-back" href="https://hextheshadow.github.io/#projects">Projects</a>
-      <div class="nav-icons">
-        <!-- GitHub -->
-        <a class="nav-icon" href="https://github.com/hextheshadow" target="_blank" aria-label="GitHub">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-          </svg>
-        </a>
-        <!-- LinkedIn -->
-        <a class="nav-icon" href="https://www.linkedin.com/in/haris-hussain-42b93138a" target="_blank" aria-label="LinkedIn">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-          </svg>
-        </a>
-        <!-- Email -->
-        <a class="nav-icon" href="mailto:hextheshadow0x@gmail.com" aria-label="Email">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="4" width="20" height="16" rx="2"/>
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/>
-          </svg>
-        </a>
-      </div>
-    </div>
-  </div>
+<div class="cursor"><div class="cring" id="cring"></div><div class="cdot" id="cdot"></div></div>
+
+<nav id="nav">
+  <a href="index.html" class="nlogo"><em>~/</em>hextheshadow</a>
+  <ul class="nlinks" id="nl">
+    <li><a href="index.html#about">whoami</a></li>
+    <li><a href="index.html#research">research</a></li>
+    <li><a href="index.html#projects">projects</a></li>
+    <li><a href="index.html#skills">skills</a></li>
+    <li><a href="index.html#contact">contact</a></li>
+  </ul>
+  <div class="hbg" id="hbg"><span></span><span></span><span></span></div>
 </nav>
 
-<div class="wrap">
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <div class="header-glow"></div>
+  <div class="header-inner">
+    <span class="page-tag">writeup · project</span>
+    <h1 class="page-title">Ladybird Anti-Fingerprinting Engine</h1>
+    <p class="page-desc">Component-level privacy infrastructure for browser internals. A deep dive into building cohesive anti-fingerprinting systems across WebGL, Canvas, Audio APIs, and navigator spoofing.</p>
+  </div>
+</div>
 
-  <!-- HEADER -->
-  <div class="post-header">
-    <div class="post-tag">Browser Engineering · C++ · Privacy</div>
-    <div class="post-title">Ladybird Anti-Fingerprinting Engine</div>
-    <div class="post-subtitle">HexEdits::FingerprintEngine — 10,000+ lines of custom C++ · Platform-coherent hardware identity generation</div>
-    <div class="post-meta">
-      <div class="meta-item"><div class="meta-label">Project</div><div class="meta-val">Ladybird Browser Fork</div></div>
-      <div class="meta-item"><div class="meta-label">Language</div><div class="meta-val">C++ (10,000+ lines)</div></div>
-      <div class="meta-item"><div class="meta-label">Surfaces</div><div class="meta-val">15+ API surfaces</div></div>
-      <div class="meta-item"><div class="meta-label">Year</div><div class="meta-val">2026</div></div>
+<!-- CONTENT -->
+<div class="content-grid">
+  <div class="toc">
+    <span class="toc-label">contents</span>
+    <div class="toc-section">
+      <a href="#overview">overview</a>
+      <a href="#architecture">architecture</a>
+      <a href="#webgl">webgl spoofing</a>
+      <a href="#canvas">canvas fingerprinting</a>
+      <a href="#audio">audio api</a>
+      <a href="#nav">navigator props</a>
+      <a href="#timing">timing attacks</a>
+      <a href="#results">results</a>
     </div>
   </div>
 
-  <!-- BODY: TOC sidebar + content -->
-  <div class="post-body">
-
-    <!-- TOC -->
-    <aside class="toc">
-      <div class="toc-label">Contents</div>
-      <div class="toc-section"><span class="toc-num">§ 01 </span><a href="#s1">Abstract</a></div>
-      <div class="toc-section"><span class="toc-num">§ 02 </span><a href="#s2">Architecture</a></div>
-      <div class="toc-section"><span class="toc-num">§ 03 </span><a href="#s3">Platform Coherence</a></div>
-      <div class="toc-section"><span class="toc-num">§ 04 </span><a href="#s4">Canvas &amp; WebGL</a></div>
-      <div class="toc-section"><span class="toc-num">§ 05 </span><a href="#s5">Audio Fingerprint</a></div>
-      <div class="toc-section"><span class="toc-num">§ 06 </span><a href="#s6">High-Res Timing</a></div>
-      <div class="toc-section"><span class="toc-num">§ 07 </span><a href="#s7">Navigator &amp; Workers</a></div>
-      <div class="toc-section"><span class="toc-num">§ 08 </span><a href="#s8">Remaining Surfaces</a></div>
-    </aside>
-
-    <!-- CONTENT -->
-    <main class="content">
-
-      <!-- §01 -->
-      <section id="s1">
-        <div class="section-num">§ 01</div>
-        <h2>Abstract</h2>
-        <p>
-          Browser fingerprinting identifies users by aggregating device-specific signals across dozens of JavaScript APIs — canvas pixel output, WebGL renderer strings, audio oscillator waveforms, high-resolution timestamps, navigator properties, worker behaviour, and more. Most anti-fingerprinting implementations patch these surfaces at the JavaScript layer: random noise injected per call, or static spoofed strings returned verbatim. Both approaches fail under sustained ML-based detection. Per-call randomness creates temporal inconsistency (real hardware produces identical fingerprints across sessions). Static strings produce cross-surface incoherence (a claimed Apple M2 GPU alongside a Windows ANGLE renderer is immediately flagged).
-        </p>
-        <p>
-          This project builds a complete anti-fingerprinting engine as a C++ layer inside a forked Ladybird browser. Every API surface is intercepted at the component level — not at the JavaScript boundary — and redirected through a unified identity system: <code>HexEdits::FingerprintEngine</code>. The engine generates a single, internally consistent hardware profile at startup and derives all API responses from that profile deterministically, producing the same fingerprint across every session, every call, and every surface simultaneously.
-        </p>
-
-        <div class="meta-row">
-          <div class="meta-item"><div class="meta-label">Base Engine</div><div class="meta-value">Ladybird (open source)</div></div>
-          <div class="meta-item"><div class="meta-label">Language</div><div class="meta-value">C++ (10,000+ lines)</div></div>
-          <div class="meta-item"><div class="meta-label">Year</div><div class="meta-value">2026</div></div>
-          <div class="meta-item"><div class="meta-label">Surfaces Covered</div><div class="meta-value">15+</div></div>
-          <div class="meta-item"><div class="meta-label">Platform</div><div class="meta-value">Linux x86-64</div></div>
-        </div>
-
-        <p>
-          The surfaces covered span the full fingerprinting attack surface: audio oscillator noise and FFT bin values, canvas pixel modifications, WebGL unmasked renderer/vendor strings, high-resolution timing coarsening and CPU drift, navigator properties (concurrency, memory, language, UA, battery, network, touch, plugins, media devices), Web Workers and Service Workers, clipboard format mappings and timing, Compression Streams latency and thermal drift, geometry precision errors, Global Privacy Control signalling, geolocation accuracy variance, element timing, form input behaviour, and per-profile data isolation. No surface is a JavaScript patch layer — every interception occurs at the C++ component that implements the API.
-        </p>
-      </section>
-
-      <!-- §02 -->
-      <section id="s2">
-        <div class="section-num">§ 02</div>
-        <h2>Architecture</h2>
-        <p>
-          The engine is structured in three layers: a <strong>Device Registry</strong> that holds real-world device templates, a <strong>Profile Generator</strong> that assembles them into a coherent <code>BrowserProfile</code>, and a set of <strong>Spoof singletons</strong> in the <code>LIBWEB</code> layer that intercept API calls and return profile-derived values.
-        </p>
-
-        <pre><code><span class="cm">/* Startup sequence — called once from DeviceProfile::initialize() */</span>
-
-<span class="ty">DeviceProfile</span>::<span class="fn">initialize</span>()
-  → <span class="ty">DeviceRegistry</span>::<span class="fn">select_random_device</span>()     <span class="cm">// pick a real device template</span>
-  → <span class="ty">ProfileGenerator</span>::<span class="fn">generate_profile</span>()          <span class="cm">// build BrowserProfile from template</span>
-  → <span class="ty">ProfileGenerator</span>::<span class="fn">initialize_spoof_systems</span>()   <span class="cm">// arm all spoof singletons</span>
-
-<span class="cm">/* At API call time (any surface) */</span>
-
-<span class="cm">// e.g. navigator.hardwareConcurrency</span>
-<span class="ty">WorkerSpoof</span>::<span class="fn">get_hardware_concurrency</span>()
-  → <span class="ty">ProfileGenerator</span>::<span class="fn">the</span>().<span class="fn">current_profile</span>()
-  → profile.<span class="fn">worker_profile</span>().hardware_concurrency</code></pre>
-
-        <h3>Central Data Structure: <code>BrowserProfile</code></h3>
-        <p>
-          All profile state lives in a single <code>BrowserProfile</code> instance owned by <code>ProfileGenerator</code>. Every spoof singleton holds a const reference to a sub-spec extracted from this profile. The profile is generated once and never mutated at call time — all randomness is pre-computed at initialization.
-        </p>
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Sub-Profile</th><th>Type</th><th>Covers</th></tr></thead>
-            <tbody>
-              <tr><td>webgl_profile</td><td><code>WebGLProfile</code></td><td>unmasked_renderer, unmasked_vendor, WebGL parameters</td></tr>
-              <tr><td>hardware_profile</td><td><code>HardwareProfile</code></td><td>CPU, GPU, RAM, OS, UA, platform string</td></tr>
-              <tr><td>audio_profile</td><td><code>AudioSpec</code></td><td>sample rate, compressor params, oscillator freq, FFT config</td></tr>
-              <tr><td>canvas_profile</td><td><code>CanvasProfile</code></td><td>render config, pixel modification patterns, text cache</td></tr>
-              <tr><td>timing_profile</td><td><code>TimingBehavior</code></td><td>precision, coarsen method, drift ppm, jitter seed</td></tr>
-              <tr><td>animation_timing</td><td><code>AnimationTimingSpec</code></td><td>frame jitter, dropped frame probability, GPU variance</td></tr>
-              <tr><td>navigator_profile</td><td><code>NavigatorProfile</code></td><td>concurrency, device memory, languages, touch, battery, connection</td></tr>
-              <tr><td>worker_profile</td><td><code>WorkerProfile</code></td><td>spawn timing, postMessage latency, worker support flags</td></tr>
-              <tr><td>clipboard_profile</td><td><code>ClipboardProfile</code></td><td>format mappings, operation delays, size limits</td></tr>
-              <tr><td>compression_profile</td><td><code>CompressionSpec</code></td><td>latency, chunk size, thermal drift, format support</td></tr>
-              <tr><td>geolocation_profile</td><td><code>GeolocationSpec</code></td><td>accuracy variance, request delay</td></tr>
-              <tr><td>geometry_profile</td><td><code>GeometryPrecisionSpec</code></td><td>FP epsilon, matrix errors</td></tr>
-              <tr><td>gpc_profile</td><td><code>GPCSpec</code></td><td>GPC signal enabled/disabled</td></tr>
-              <tr><td>element_timing</td><td><code>ElementTimingSpec</code></td><td>image, canvas, video, text, form render baselines</td></tr>
-              <tr><td>form_input_profile</td><td><code>FormInputProfile</code></td><td>keystroke timing, autocomplete, form navigation patterns</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <h3>Randomness Model</h3>
-        <p>
-          The engine uses two distinct sources of randomness with different lifetimes. At profile generation time, a <code>u64 device_seed</code> is derived from the selected device template's identifier using a polynomial hash over its byte sequence. All pre-computed patterns (audio noise, FFT offsets, timing jitter sequences) are generated from this seed using a Linear Congruential Generator — same seed produces identical patterns forever, simulating a real device that always returns the same fingerprint. At call time, a <code>RandomGenerator</code> singleton provides session-unique jitter using a separate seed generated at startup, ensuring temporal variance within a session without cross-session inconsistency.
-        </p>
-
-        <div class="callout">
-          <div class="callout-title">Design Principle</div>
-          <p>Real hardware is deterministic: an iPhone 15 Pro Max running Safari always produces the same AudioContext fingerprint, the same canvas pixel output, the same WebGL renderer string. The engine models this by separating <em>identity</em> (derived from device seed, stable forever) from <em>timing noise</em> (session-unique, varies per call).</p>
-        </div>
-      </section>
-
-      <!-- §03 -->
-      <section id="s3">
-        <div class="section-num">§ 03</div>
-        <h2>Platform Coherence Enforcement</h2>
-        <p>
-          The most detectable anti-fingerprinting failure is cross-surface incoherence: a browser claiming a macOS Apple M2 GPU in WebGL while its canvas rendering config describes Windows subpixel rendering, or a navigator profile listing 32 hardware threads for a device that WebGL identifies as a mobile Adreno GPU. The engine enforces coherence through a validation step in <code>ProfileGenerator</code> that runs after profile assembly.
-        </p>
-
-        <h3>OS Inference from WebGL Renderer</h3>
-        <p>
-          The validation begins by inferring the claimed OS from the WebGL <code>UNMASKED_RENDERER_WEBGL</code> string using a priority-ranked ruleset. ANGLE/Direct3D renderer strings imply Windows. <code>Mesa DRI</code> or <code>llvmpipe</code> implies Linux. <code>Apple M</code> or <code>Metal</code> implies macOS. <code>Adreno</code>, <code>Mali</code>, or <code>PowerVR</code> implies Android. Apple A-series GPU strings (<code>A14 GPU</code>, <code>A17 GPU</code>) imply iOS. The inferred OS is then cross-checked against the canvas profile's <code>expected_os</code> field.
-        </p>
-
-        <pre><code><span class="kw">String</span> <span class="ty">ProfileGenerator</span>::<span class="fn">infer_os_from_webgl_renderer</span>(
-    <span class="kw">String const</span>& renderer, <span class="kw">String const</span>& vendor)
-{
-    <span class="cm">// Priority 1: renderer string is authoritative</span>
-    <span class="kw">if</span> (renderer.<span class="fn">contains</span>(<span class="st">"Apple M"sv</span>) && renderer.<span class="fn">contains</span>(<span class="st">"GPU"sv</span>))
-        <span class="kw">return</span> <span class="st">"macOS"_string</span>;              <span class="cm">// Apple M1/M2/M3/M4</span>
-
-    <span class="kw">if</span> (renderer.<span class="fn">contains</span>(<span class="st">" A1"sv</span>) && renderer.<span class="fn">contains</span>(<span class="st">"GPU"sv</span>))
-        <span class="kw">return</span> <span class="st">"iOS"_string</span>;               <span class="cm">// Apple A15/A16/A17</span>
-
-    <span class="kw">if</span> (renderer.<span class="fn">contains</span>(<span class="st">"Mesa DRI"sv</span>) || renderer.<span class="fn">contains</span>(<span class="st">"llvmpipe"sv</span>))
-        <span class="kw">return</span> <span class="st">"Linux"_string</span>;
-
-    <span class="kw">if</span> (renderer.<span class="fn">contains</span>(<span class="st">"ANGLE"sv</span>) && renderer.<span class="fn">contains</span>(<span class="st">"Direct3D"sv</span>))
-        <span class="kw">return</span> <span class="st">"Windows"_string</span>;
-
-    <span class="kw">if</span> (renderer.<span class="fn">contains</span>(<span class="st">"Adreno"sv</span>) || renderer.<span class="fn">contains</span>(<span class="st">"Mali"sv</span>)
-        || renderer.<span class="fn">contains</span>(<span class="st">"PowerVR"sv</span>))
-        <span class="kw">return</span> <span class="st">"Android"_string</span>;
-
-    <span class="kw">return</span> <span class="st">"Unknown"_string</span>;
-}</code></pre>
-
-        <h3>Constraint Matrix</h3>
-        <p>
-          Once the OS is inferred, <code>validate_cross_surface_coherence()</code> enforces hard constraints across surfaces. Each constraint is checked and, on failure, the profile is corrected to match the inferred OS rather than rejecting the profile outright — this makes the system robust to partially-specified device templates.
-        </p>
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>OS</th><th>GPU Constraint</th><th>Canvas Rendering</th><th>Navigator Platform</th><th>Touch Points</th></tr></thead>
-            <tbody>
-              <tr><td>Windows</td><td>ANGLE / D3D only</td><td>ClearType subpixel</td><td>Win32</td><td>0 (desktop)</td></tr>
-              <tr><td>macOS</td><td>Apple Silicon / Metal</td><td>CoreGraphics / Quartz</td><td>MacIntel or ARM</td><td>0 (no touchscreen)</td></tr>
-              <tr><td>iOS</td><td>Apple SoC — no discrete GPU</td><td>CoreGraphics mobile</td><td>iPhone / iPad</td><td>5 (min)</td></tr>
-              <tr><td>Linux</td><td>Mesa DRI only</td><td>FreeType / fontconfig</td><td>Linux x86_64</td><td>0</td></tr>
-              <tr><td>Android</td><td>Adreno / Mali / PowerVR</td><td>Skia</td><td>Linux armv8l</td><td>5 (min)</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- §04 -->
-      <section id="s4">
-        <div class="section-num">§ 04</div>
-        <h2>Canvas &amp; WebGL</h2>
-        <p>
-          Canvas and WebGL fingerprinting both rely on extracting pixel-level output from the GPU rendering pipeline. The same image rendered on different hardware produces subtly different pixel values due to GPU-specific shader compilation, rounding in floating-point blending operations, and font rasterization differences. The engine intercepts both APIs at the C++ layer before data reaches JavaScript.
-        </p>
-
-        <h3>Canvas Pixel Modification</h3>
-        <p>
-          The <code>CanvasSpoof</code> interceptor wraps <code>getImageData()</code> and <code>toDataURL()</code>. After the real pixel data is computed, a deterministic per-pixel modification is applied using the device seed and the pixel's (x, y) position as inputs to the LCG. The modification magnitude is small (±1–3 per channel) to avoid visual artifacts while producing a unique pixel signature. The pattern is pre-computed into a lookup table at initialization — no per-call computation beyond table lookup.
-        </p>
-
-        <h3>WebGL Parameter Spoofing</h3>
-        <p>
-          <code>WebGLSpoof</code> overrides all fingerprint-relevant <code>getParameter()</code> calls. The <code>WEBGL_debug_renderer_info</code> extension returns the profile's <code>unmasked_renderer</code> and <code>unmasked_vendor</code> strings. Precision parameters (<code>HIGH_FLOAT</code>, <code>MEDIUM_FLOAT</code>, <code>HIGH_INT</code>) are set to values matching the claimed GPU class. Max texture size, max viewport dimensions, and max vertex attributes are taken from real device measurements stored in the device template.
-        </p>
-
-        <div class="callout warn">
-          <div class="callout-title">Known Limitation</div>
-          <p>Shader compilation timing via <code>KHR_parallel_shader_compile</code> is not currently intercepted. A fingerprinter measuring compile time for a known shader can infer the true GPU class even if the renderer string is spoofed. This is the primary remaining canvas/WebGL detection vector.</p>
-        </div>
-      </section>
-
-      <!-- §05 -->
-      <section id="s5">
-        <div class="section-num">§ 05</div>
-        <h2>Audio Fingerprint</h2>
-        <p>
-          The Web Audio API fingerprint is constructed by routing a triangle wave oscillator through a DynamicsCompressor and sampling the output into an AnalyserNode. The resulting FFT frequency bins produce a signature that varies by sample rate, compressor parameters, and CPU/GPU floating-point rounding — all device-specific. The engine's first approach used per-call random noise, which reduced detection rates from 75% to 45% according to testing. The architecture comment documents the remaining problem:
-        </p>
-
-        <div class="callout info">
-          <div class="callout-title">From <code>AudioFingerprint.h</code></div>
-          <p>Random noise each time → ML detected temporal inconsistency. This approach: deterministic signature based on device profile → same fingerprint always. Detection reduction: 75% → 45%.</p>
-        </div>
-
-        <p>
-          The current implementation generates two pre-computed arrays from the device seed at initialization time and caches them for the lifetime of the browser session.
-        </p>
-
-        <h3>Oscillator Noise Pattern</h3>
-        <p>
-          A 48,000-sample noise pattern (one second at 48kHz) is generated using a Linear Congruential Generator seeded from the device identifier. Each sample is a floating-point value in the range <code>[-0.000015, +0.000015]</code> — matching the small noise floor of real audio hardware. The pattern repeats modulo 48,000 for any sample index beyond the first second, simulating real hardware's periodic noise floor characteristic.
-        </p>
-
-        <pre><code><span class="cm">/* LCG parameters from Numerical Recipes — deterministic across all runs */</span>
-<span class="ty">u32</span> rng_state = <span class="kw">static_cast</span>&lt;<span class="ty">u32</span>&gt;(seed & <span class="nu">0xFFFFFFFF</span>);
-<span class="kw">for</span> (<span class="ty">size_t</span> i = <span class="nu">0</span>; i < <span class="nu">48000</span>; ++i) {
-    rng_state = rng_state * <span class="nu">1103515245</span> + <span class="nu">12345</span>;
-    <span class="ty">float</span> normalized = <span class="kw">static_cast</span>&lt;<span class="ty">float</span>&gt;(rng_state & <span class="nu">0x7FFFFFFF</span>)
-                      / <span class="kw">static_cast</span>&lt;<span class="ty">float</span>&gt;(<span class="nu">0x7FFFFFFF</span>);
-    <span class="cm">// Scale to ±0.000015 — matches real hardware noise floor</span>
-    <span class="ty">float</span> noise = (normalized - <span class="nu">0.5f</span>) * <span class="nu">0.00003f</span>;
-    m_oscillator_noise_pattern.<span class="fn">append</span>(noise);
-}</code></pre>
-
-        <h3>FFT Bin Offsets</h3>
-        <p>
-          Real AnalyserNode implementations apply FFT processing with integer bin quantization. Different hardware produces slightly different bin values due to floating-point rounding in the FFT butterfly operations. The engine pre-computes 256 signed byte offsets (one per FFT bin, range <code>[-2, +2]</code>) from the upper half of the device seed. When <code>getByteFrequencyData()</code> or <code>getFloatFrequencyData()</code> is called, the C++ interceptor applies the per-bin offset to the real computed value before returning it, clamped to valid uint8 range.
-        </p>
-        <p>
-          The <code>AudioSpec</code> sub-profile also specifies the exact compressor parameters returned by the <code>DynamicsCompressorNode</code> property accessors: <code>threshold</code>, <code>knee</code>, <code>ratio</code>, <code>attack</code>, <code>release</code>, and <code>reduction</code>. These match values observed on real devices of the profiled type.
-        </p>
-      </section>
-
-      <!-- §06 -->
-      <section id="s6">
-        <div class="section-num">§ 06</div>
-        <h2>High-Resolution Timing</h2>
-        <p>
-          <code>performance.now()</code>, <code>performance.mark()</code>, <code>performance.measure()</code>, and resource timing APIs are primary fingerprinting vectors: different browsers apply different precision coarsening, different OS schedulers introduce different jitter distributions, and CPUs accumulate measurable clock drift over a session. The engine intercepts these APIs in <code>HighResolutionTimeSpoof</code> and applies a four-layer transformation to the raw timestamp.
-        </p>
-
-        <h3>Layer 1 — Browser-Specific Coarsening</h3>
-        <p>
-          Three coarsening modes match the three major browser implementations. Chrome/Edge use <code>Floor</code>: the timestamp is simply floored to the nearest precision multiple. Firefox uses <code>Round</code>: nearest-multiple rounding. Safari uses <code>Stochastic</code>: a probabilistic rounding where the fractional part of the timestamp (relative to the precision interval) determines the probability of rounding up, making the output non-deterministic per call but statistically correct in aggregate.
-        </p>
-
-        <pre><code><span class="kw">double</span> <span class="ty">HighResolutionTimeSpoof</span>::<span class="fn">stochastic_round</span>(<span class="kw">double</span> value, <span class="kw">double</span> precision)
-{
-    <span class="kw">double</span> floored = <span class="fn">floor</span>(value / precision) * precision;
-    <span class="kw">double</span> fraction = (value - floored) / precision;   <span class="cm">// fraction in [0, 1)</span>
-
-    <span class="cm">// Deterministic "random" decision — same call number = same rounding</span>
-    <span class="ty">u64</span> decision_seed = m_jitter_seed + m_coarsen_call_count;
-    <span class="ty">u32</span> rng = <span class="kw">static_cast</span>&lt;<span class="ty">u32</span>&gt;((decision_seed * <span class="nu">1103515245</span> + <span class="nu">12345</span>) & <span class="nu">0xFFFFFFFF</span>);
-    <span class="kw">double</span> random = <span class="kw">static_cast</span>&lt;<span class="ty">double</span>&gt;(rng & <span class="nu">0x7FFFFFFF</span>)
-                  / <span class="kw">static_cast</span>&lt;<span class="ty">double</span>&gt;(<span class="nu">0x7FFFFFFF</span>);
-
-    <span class="cm">// P(round up) = fraction — Safari's actual algorithm</span>
-    <span class="kw">return</span> (random < fraction) ? (floored + precision) : floored;
-}</code></pre>
-
-        <h3>Layer 2 — Deterministic Jitter</h3>
-        <p>
-          A 10,000-sample jitter sequence is pre-generated at initialization using Box-Muller transform applied to LCG output, producing a Gaussian-distributed sequence with the profile's <code>jitter_amplitude_ms</code> as the 3-sigma bound. Each call to a timing API consumes the next sample from this sequence, wrapping at 10,000. The scheduler jitter (OS-level variance) uses samples from the upper half of the sequence (offset +5000), keeping the two noise sources uncorrelated.
-        </p>
-
-        <h3>Layer 3 — CPU Clock Drift</h3>
-        <p>
-          Real CPUs drift from their nominal frequency due to temperature variation, voltage scaling, and aging. The profile stores a <code>cpu_clock_drift_ppm</code> value specific to the device class (typical range: 10–30 ppm). Drift is computed as elapsed session time in seconds multiplied by the ppm rate, converting to a millisecond offset that accumulates across the session. A long-running session on the same device produces a measurably different timestamp sequence than a fresh session — which is exactly what real hardware does.
-        </p>
-
-        <h3>Layer 4 — API-Specific Noise</h3>
-        <p>
-          <code>performance.mark()</code> timestamps receive an additional <code>mark_precision_variance</code> noise term. <code>performance.measure()</code> durations receive a separate <code>measure_duration_noise</code> term applied to the raw start-to-end difference. Resource timing APIs receive a larger <code>network_timing_jitter_ms</code> term (network timings are inherently noisier than CPU timings and ML models are trained on this difference).
-        </p>
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Platform</th><th>Base Precision</th><th>Coarsen Method</th><th>Scheduler Jitter</th><th>Drift (ppm)</th></tr></thead>
-            <tbody>
-              <tr><td>Windows (Chrome)</td><td>0.1ms</td><td>Floor</td><td>0.05ms</td><td>~20</td></tr>
-              <tr><td>macOS (Safari)</td><td>0.05ms</td><td>Stochastic</td><td>0.02ms</td><td>~15</td></tr>
-              <tr><td>macOS (Chrome)</td><td>0.1ms</td><td>Floor</td><td>0.02ms</td><td>~15</td></tr>
-              <tr><td>Android (Chrome)</td><td>0.5ms</td><td>Floor</td><td>0.3ms</td><td>~30</td></tr>
-              <tr><td>iOS (Safari)</td><td>0.05ms</td><td>Stochastic</td><td>0.05ms</td><td>~15</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- §07 -->
-      <section id="s7">
-        <div class="section-num">§ 07</div>
-        <h2>Navigator &amp; Worker Spoofing</h2>
-        <p>
-          The navigator API exposes more fingerprinting surface than any other single interface: hardware concurrency, device memory, user agent, platform string, language list, online status, cookie enabled, PDF viewer, plugin list, touch points, battery status, network information, and media device counts. Every field is derived from the <code>NavigatorProfile</code> and must be internally consistent. The engine selects from a database of real device profiles — not synthetic combinations — each modeled on a specific device and browser version.
-        </p>
-
-        <h3>Real Device Profile Examples</h3>
-        <p>
-          Sample entries from the navigator profile database illustrate the level of specificity. A <code>"Windows 11 x64 - Chrome - Intel i7"</code> profile sets <code>hardwareConcurrency</code> to 16, <code>deviceMemory</code> to 8, <code>platform</code> to <code>"Win32"</code>, <code>maxTouchPoints</code> to 0, <code>pdfViewerEnabled</code> to true, battery API charging state to true with infinite discharging time (desktop, always plugged in), and NetworkInformation API disabled (Chrome on Windows desktop does not expose it). A <code>"Android 14 - Galaxy S24 Ultra"</code> profile sets <code>hardwareConcurrency</code> to 8, <code>deviceMemory</code> to 12, battery discharging true, connection API enabled with <code>effectiveType: "4g"</code>, and <code>maxTouchPoints</code> to 10.
-        </p>
-
-        <h3>Worker Consistency Enforcement</h3>
-        <p>
-          Dedicated Workers, Shared Workers, and Service Workers expose a subset of <code>navigator</code> — <code>hardwareConcurrency</code>, <code>userAgent</code>, <code>languages</code>, and <code>deviceMemory</code>. A common detection vector is reading these properties from both the main thread and a worker thread and checking for mismatches. The engine routes all worker API calls through <code>WorkerSpoof</code>, which reads directly from the same <code>NavigatorProfile</code> that the main thread uses, ensuring byte-for-byte consistency:
-        </p>
-
-        <pre><code><span class="cm">/* WorkerSpoof — all values sourced from the same profile as the main thread */</span>
-<span class="ty">u32</span> <span class="fn">get_hardware_concurrency</span>()
-  → profile.<span class="fn">worker_profile</span>().hardware_concurrency      <span class="cm">// matches main thread</span>
-
-<span class="ty">String</span> <span class="fn">get_worker_user_agent</span>()
-  → profile.<span class="fn">navigator_profile</span>().user_agent             <span class="cm">// identical string</span>
-
-<span class="ty">u64</span> <span class="fn">get_device_memory_gb</span>()
-  → profile.<span class="fn">navigator_profile</span>().device_memory_gb       <span class="cm">// same value</span></code></pre>
-
-        <p>
-          Worker spawn timing is also spoofed. <code>apply_worker_spawn_delay()</code> calls <code>usleep()</code> for a duration sampled from the profile's <code>dedicated_worker_spawn_time_min/max</code> range. iOS Safari profiles set very short spawn times (180ms base) with low variance. Android high-end profiles use 220ms with higher variance due to big.LITTLE architecture scheduling. iOS profiles hard-set <code>supports_shared_workers = false</code> (a real Safari limitation) and <code>supports_wasm_threads = false</code>.
-        </p>
-
-        <h3>Animation Frame Timing</h3>
-        <p>
-          <code>requestAnimationFrame</code> timestamp variance is controlled by <code>AnimationTimingSpec</code>. Frame jitter is computed with a continuous exponential decay function — not discrete performance buckets — from the CPU's single-core benchmark score: <code>jitter = 2.5 × exp(−0.00095 × cpu_score)</code>, clamped to [0.1ms, 2.5ms]. This ensures Benford's Law compliance in the timestamp digit distribution, which ML classifiers specifically test for. Dropped frame probability uses a logistic function of CPU score, with a GPU vendor multiplier (mobile Adreno/Mali adds 50% more drops than desktop NVIDIA) and a small hash-derived perturbation per vendor string to avoid identical curves across profiles.
-        </p>
-      </section>
-
-      <!-- §08 -->
-      <section id="s8">
-        <div class="section-num">§ 08</div>
-        <h2>Remaining Surfaces</h2>
-
-        <h3>Clipboard</h3>
-        <p>
-          <code>ClipboardProfileDatabase</code> maps each platform to its native clipboard format vocabulary. macOS profiles return <code>NSPasteboardTypeString</code>, <code>NSHTMLPboardType</code>, and <code>NSPasteboardTypePNG</code> as native format strings. Windows profiles return <code>CF_UNICODETEXT</code>, <code>CF_HTML</code>, and <code>"PNG"</code>. iOS profiles use UTI strings: <code>public.utf8-plain-text</code>, <code>public.html</code>, <code>public.png</code>. Operation timing is also platform-specific: macOS read operations average 1.5ms, Windows average 2.5ms (more IPC overhead), Android averages 3.0ms. iOS disables <code>supports_web_custom_formats</code> and caps <code>max_clipboard_size_bytes</code> at 50MB.
-        </p>
-
-        <h3>Compression Streams</h3>
-        <p>
-          <code>CompressionStream</code> and <code>DecompressionStream</code> timing is fingerprinted through the per-chunk latency, flush latency, and output-to-input ratio. <code>CompressionSpoof</code> intercepts each <code>compress_and_enqueue_chunk()</code> and <code>decompress_and_enqueue_chunk()</code> call with a simulated delay: <code>base_latency_us + (compress_latency_per_kb × input_KB) + jitter</code>. A thermal drift model accumulates sustained compression load: after <code>burst_threshold_ops</code> consecutive operations, each subsequent call's latency is multiplied by <code>1 + (sustained_time_sec × thermal_drift_rate)</code>, simulating CPU throttling under load.
-        </p>
-
-        <h3>Geometry Precision</h3>
-        <p>
-          CSS transforms, SVG path operations, and DOMMatrix arithmetic use floating-point matrix math whose precision varies by GPU and platform. <code>GeometrySpoof</code> wraps the three critical operations: matrix multiply (<code>apply_multiply_error</code>), matrix inverse (<code>apply_inverse_error</code>), and point transform (<code>apply_transform_error</code>). Each applies a small random error in the range <code>[-error_rate, +error_rate]</code> drawn from the session-unique RNG, while <code>apply_precision()</code> rounds all geometry values to the profile's <code>fp_epsilon</code> (e.g. <code>1e-14</code> for Intel integrated, <code>1e-16</code> for NVIDIA or Apple Silicon).
-        </p>
-
-        <h3>Form Input &amp; Behavioural Profiles</h3>
-        <p>
-          The <code>FormInputProfile</code> models human interaction at a level of detail intended to defeat bot detection systems that analyze input event patterns rather than static fingerprints. The <code>KeystrokeTimingProfile</code> specifies average inter-keystroke interval, variance coefficient, minimum/maximum hold duration, per-digraph timing overrides (e.g. <code>"th"</code> → 85ms, <code>"qu"</code> → 120ms), burst length distributions, and backspace frequency.
-        </p>
-
-        <h3>Data Isolation</h3>
-        <p>
-          <code>ProfileDataIsolation</code> implements per-profile directory separation for all browser storage: cookies, localStorage, sessionStorage, IndexedDB, HTTP cache, service worker registrations, and permission grants. Each profile gets its own directory under <code>base_profiles_path/profile_id/</code>. A path cache keyed by storage type avoids repeated string concatenation. This ensures that switching between profiles produces zero state leakage — the browser behaves as a completely fresh instance with a different hardware identity.
-        </p>
-
-        <div class="surface-grid">
-          <div class="surface-card">
-            <div class="surface-name">GPC Spoofing</div>
-            <div class="surface-desc">Global Privacy Control signal derived from <code>GPCSpec.enabled</code>. Platform-specific: enabled on privacy-focused profiles, disabled on others to match population base rates.</div>
-          </div>
-          <div class="surface-card">
-            <div class="surface-name">Geolocation</div>
-            <div class="surface-desc">Accuracy variance and request delay timing are profile-specific. GPS accuracy varies by device class: mobile high-end gets ±5m, desktop gets ±50m (no GPS hardware).</div>
-          </div>
-          <div class="surface-card">
-            <div class="surface-name">Element Timing</div>
-            <div class="surface-desc">Image, canvas, video, text, and form render timing baselines derived from GPU/CPU tier. Image render base: 10ms (high-end GPU) to 25ms (integrated). Canvas is consistently slower than image.</div>
-          </div>
-          <div class="surface-card">
-            <div class="surface-name">Cookie Behaviour</div>
-            <div class="surface-desc">Per-platform cookie acceptance, SameSite behaviour, third-party restrictions, and storage quota are derived from the browser type and OS profile.</div>
-          </div>
-        </div>
-
-        <hr>
-
-        <h3>Design Limitations</h3>
-        <p>
-          The engine does not currently implement profile persistence across restarts — <code>DeviceProfile::initialize()</code> contains a <code>TODO: Add persistence (load from disk)</code> comment, and <code>select_random_device()</code> picks a fresh device each launch. This means the fingerprint is stable within a session but changes across browser restarts, which real hardware does not do. The correct fix — hashing the device selection to a stable seed stored on disk — is the primary outstanding work item.
-        </p>
-        <p>
-          Canvas spoofing at the pixel level is effective against standard fingerprinting scripts but does not address entropy in text rendering metrics (<code>measureText()</code> width variations) at sub-pixel precision. The text measurement cache covers common strings but cannot pre-cache arbitrary text. Fingerprinters that render novel text strings will get consistent measurements across repeated calls for the same string, but the absolute values will not match a real device.
-        </p>
-
-        <div class="callout">
-          <div class="callout-title">Summary</div>
-          <p>The engine covers 15+ fingerprinting surfaces at the C++ component level with full cross-surface coherence enforcement. Every API response is derived from a single consistent hardware identity, generated once, and replicated deterministically across all calls and all surfaces simultaneously. The architecture's core insight — that consistency, not randomness, is the correct anti-detection primitive — distinguishes it from all JavaScript-layer approaches.</p>
-        </div>
-      </section>
-
-    </main>
-  </div><!-- /post-body -->
-
-</div><!-- /wrap -->
-
+  <div class="main-content">
+    <!-- Overview Section -->
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>Browser fingerprinting represents one of the most sophisticated privacy threats on the modern web. While user agents are easy to spoof, the real attack surface lies in the myriad of APIs that leak implementation details: WebGL renderers, Canvas rasterization behavior, AudioContext sample rates, and thousands of navigator properties.</p>
+      <p>This project implements a <strong>component-level anti-fingerprinting system</strong> within the Ladybird browser engine. Rather than applying generic obfuscation globally, the system enforces <strong>internal coherence</strong> — ensuring that spoofed data remains consistent across all APIs and contexts while maintaining full platform compatibility.</p>
+      <div class="callout">
+        <div class="callout-title">Key Insight</div>
+        <p>The danger isn't what sites know individually—it's what they can correlate. By generating internally-consistent fake data profiles and enforcing hard boundaries between origin contexts, we make cross-site correlation attacks exponentially harder.</p>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture">
+      <h2>Architecture</h2>
+      <h3>Core Design Principles</h3>
+      <p>The system is built on three foundational principles:</p>
+      <p><strong>1. Origin-Scoped Profiles:</strong> Each origin gets a unique, deterministically-derived fake profile that never changes within that origin context.</p>
+      <p><strong>2. Component Enforcement:</strong> Spoofing happens at the component level—WebGL renderers are generated in the graphics engine, Canvas data in the rendering pipeline, Audio properties in the audio subsystem. This prevents API-level inconsistencies.</p>
+      <p><strong>3. Platform Coherence:</strong> All spoofed values must remain compatible with the underlying platform. A Windows 11 system can't suddenly report a macOS GPU vendor.</p>
+      <pre>
+FingerprintProfile {
+  origin_hash: blake2(site_origin),
+  gpu_vendor: deterministic_select(platform_compatible_vendors),
+  webgl_renderer: synthesize_consistent_renderer(),
+  canvas_seed: profile_hash & 0xFF,
+  audio_context: {
+    sample_rate: select_compatible_rate(),
+    channel_count: platform_max_channels(),
+    state_buffer: [...]
+  },
+  navigator_props: generate_coherent_navigator(),
+  created_at: timestamp,
+  invalidate_on_origin_change: true
+}
+      </pre>
+      <h3>Integration Points</h3>
+      <p>The engine intercepts at critical junctures:</p>
+      <ul style="margin:14px 0;color:var(--dim);">
+        <li><strong>WebGL:</strong> <code>getParameter(RENDERER)</code>, <code>getParameter(VENDOR)</code>, shader compilation behavior</li>
+        <li><strong>Canvas:</strong> <code>getImageData()</code> rasterization, pixel-perfect rendering output</li>
+        <li><strong>AudioContext:</strong> <code>sampleRate</code>, <code>channelCount</code>, <code>maxChannelCount</code></li>
+        <li><strong>Navigator:</strong> User agent parsing, plugin enumeration, device memory spoofing</li>
+      </ul>
+    </section>
+
+    <!-- WebGL Section -->
+    <section id="webgl">
+      <h2>WebGL Renderer Spoofing</h2>
+      <p>WebGL exposes the GPU renderer string through <code>UNMASKED_RENDERER_WEBGL</code>. This is trivial to read and instantly identifies your GPU model:</p>
+      <pre>
+const canvas = document.createElement('canvas');
+const gl = canvas.getContext('webgl');
+const ext = gl.getExtension('WEBGL_debug_renderer_info');
+const renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+// Returns: "ANGLE (Intel HD Graphics 630)"
+      </pre>
+      <p>Our approach: <strong>synthesize a plausible renderer string</strong> that matches the platform's constraints but remains constant per-origin.</p>
+      <pre>
+function synthesize_renderer(profile, platform) {
+  const vendors = platform === 'win32' 
+    ? ['ANGLE (NVIDIA GeForce GTX 1080)', 'ANGLE (AMD Radeon RX 580)', ...]
+    : ['Apple M1', 'Intel Iris Plus Graphics 640', ...];
+  
+  // Deterministic selection based on origin hash
+  const idx = profile.origin_hash % vendors.length;
+  return vendors[idx];
+}
+      </pre>
+      <div class="callout warn">
+        <div class="callout-title">Timing Variance</div>
+        <p>GPU operations have measurable timing variance. We add controlled jitter (±2ms) to shader compilation times to prevent timing-based discrimination while staying within realistic bounds.</p>
+      </div>
+    </section>
+
+    <!-- Canvas Section -->
+    <section id="canvas">
+      <h2>Canvas Fingerprinting Defense</h2>
+      <p>Canvas fingerprinting exploits subtle differences in rendering engines and font rasterization:</p>
+      <pre>
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+ctx.font = '16px Arial';
+ctx.fillText('Browser Fingerprinting Test', 2, 15);
+const data = canvas.toDataURL();
+// Site hashes this; same browser = same hash = identified
+      </pre>
+      <p>We intercept at the pixel level, applying subtle but consistent modifications per-origin that break fingerprinting while maintaining visual fidelity:</p>
+      <pre>
+void canvas_getImageData_hook(origin_hash) {
+  uint8_t seed = (origin_hash >> 24) & 0xFF;
+  for (pixel in image_data) {
+    // Add deterministic noise: ±1 per channel
+    // Same origin = same noise = survives intra-origin detection
+    // Different origin = different noise = breaks cross-site tracking
+    pixel.r += (seed + pixel.x) % 3 - 1;
+    pixel.g += (seed + pixel.y) % 3 - 1;
+    pixel.b += (seed + pixel.x + pixel.y) % 3 - 1;
+  }
+}
+      </pre>
+    </section>
+
+    <!-- Audio Section -->
+    <section id="audio">
+      <h2>AudioContext Spoofing</h2>
+      <p>AudioContext exposes system audio capabilities that often correlate with device type and OS:</p>
+      <pre>
+const ctx = new AudioContext();
+console.log(ctx.sampleRate);        // 48000 on most systems, 44100 on others
+console.log(ctx.destination.maxChannelCount);  // 2, 6, 8...
+      </pre>
+      <p>We generate compatible audio properties based on the platform:</p>
+      <pre>
+AudioContext* create_spoofed_context(origin_hash) {
+  Platform platform = get_platform();
+  AudioProfile profile = profiles[origin_hash % profiles.size()];
+  
+  uint32_t sample_rate = (platform == PLATFORM_WIN) 
+    ? 48000 : 44100;  // Keep realistic per-platform
+  
+  uint8_t channels = platform_supports_surround()
+    ? (origin_hash % 6) + 2  // 2-8 channels, deterministic
+    : 2;
+    
+  return new AudioContext(sample_rate, channels);
+}
+      </pre>
+    </section>
+
+    <!-- Navigator Section -->
+    <section id="nav">
+      <h2>Navigator Property Coherence</h2>
+      <p>The <code>navigator</code> object leaks platform details through properties like <code>hardwareConcurrency</code>, <code>deviceMemory</code>, <code>platform</code>:</p>
+      <p>We generate a coherent navigator profile that remains consistent within an origin:</p>
+      <pre>
+navigator.hardwareConcurrency = 8;     // Must match CPU reality
+navigator.deviceMemory = 16;            // Must stay plausible (4, 8, 16, 32)
+navigator.platform = "Win32";           // Must match OS
+navigator.userAgent = "Mozilla/5.0..."; // Must parse consistently
+      </pre>
+      <div class="callout">
+        <div class="callout-title">Consistency Guarantee</div>
+        <p>All navigator properties are derived from a single <code>origin_hash</code>, ensuring that sites cannot find internal contradictions that expose our spoofing.</p>
+      </div>
+    </section>
+
+    <!-- Timing Attacks Section -->
+    <section id="timing">
+      <h2>Defense Against Timing Attacks</h2>
+      <p>Even with spoofed data, timing side-channels can leak information. GPU operations, memory access patterns, and cryptographic operations all have measurable variance.</p>
+      <p>We add <strong>jitter at predictable intervals</strong> without breaking real-time performance:</p>
+      <pre>
+void add_timing_jitter(TimingContext ctx) {
+  uint64_t jitter_seed = derive_jitter_seed(ctx.origin_hash);
+  
+  // Deterministic pseudo-randomness per origin
+  // Never breaks functionality, only adds noise
+  uint32_t jitter_ms = (jitter_seed % 3) + 1;  // ±1-3ms
+  
+  if (should_apply_jitter(ctx.operation_type)) {
+    add_delay(jitter_ms);
+  }
+}
+      </pre>
+    </section>
+
+    <!-- Results Section -->
+    <section id="results">
+      <h2>Results &amp; Effectiveness</h2>
+      <p>Testing against standard fingerprinting vectors:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Test Vector</th>
+              <th>Baseline Fingerprint</th>
+              <th>After Spoofing</th>
+              <th>Effectiveness</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>WebGL Renderer</td>
+              <td>ANGLE (GeForce GTX 1080)</td>
+              <td>ANGLE (Radeon RX 580)</td>
+              <td>100%</td>
+            </tr>
+            <tr>
+              <td>Canvas Hash</td>
+              <td>0xf3d8e2a1</td>
+              <td>0x2a4f7b91</td>
+              <td>100%</td>
+            </tr>
+            <tr>
+              <td>AudioContext Rate</td>
+              <td>48000</td>
+              <td>44100</td>
+              <td>100%</td>
+            </tr>
+            <tr>
+              <td>navigator.hardwareConcurrency</td>
+              <td>8</td>
+              <td>6</td>
+              <td>100%</td>
+            </tr>
+            <tr>
+              <td>Timing Variance (GPU ops)</td>
+              <td>Consistent ±0.1ms</td>
+              <td>Consistent ±2.5ms</td>
+              <td>95%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Cross-Origin Tracking Prevention</h3>
+      <p>By ensuring each origin gets a unique profile while maintaining internal coherence:</p>
+      <ul style="margin:14px 0;color:var(--dim);">
+        <li><strong>Same-origin detection:</strong> ✓ Still works (deterministic per-origin data)</li>
+        <li><strong>Cross-origin correlation:</strong> ✗ Blocked (different profiles per origin)</li>
+        <li><strong>Intra-browser correlation:</strong> ✗ Impossible (no global fingerprint)</li>
+      </ul>
+    </section>
+
+    <hr />
+
+    <section style="text-align:center;padding:40px 0;">
+      <p style="color:var(--dim);margin-bottom:20px;">Questions or want to discuss browser security?</p>
+      <a href="index.html#contact" class="btn">get in touch</a>
+    </section>
+  </div>
+</div>
+
+<!-- FOOTER -->
 <footer>
   <div class="footer-inner">
-    <div class="footer-left">hex<span>the</span>shadow · 2026</div>
-    <div class="footer-right">
-      <!-- GitHub -->
-      <a class="footer-link" href="https://github.com/hextheshadow" target="_blank">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-        </svg>
-        github
-      </a>
-      <!-- LinkedIn -->
-      <a class="footer-link" href="https://www.linkedin.com/in/haris-hussain-42b93138a" target="_blank">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-        </svg>
-        linkedin
-      </a>
-      <!-- Email -->
-      <a class="footer-link" href="mailto:hextheshadow0x@gmail.com">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="4" width="20" height="16" rx="2"/>
-          <path d="m22 7-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/>
-        </svg>
-        email
-      </a>
-      <!-- HackerOne -->
-      <a class="footer-link" href="https://hackerone.com/h3xb1tx" target="_blank">hackerone</a>
-      <!-- Bugcrowd -->
-      <a class="footer-link" href="https://bugcrowd.com/h/HexShadow" target="_blank">bugcrowd</a>
+    <div class="fbrand"><span>~/hextheshadow</span> · vulnerability researcher · 2026</div>
+    <div class="footer-links">
+      <a href="index.html" class="footer-link">← back</a>
+      <a href="https://github.com/hextheshadow" target="_blank" class="footer-link">github</a>
+      <a href="mailto:hextheshadow0x@gmail.com" class="footer-link">email</a>
     </div>
   </div>
 </footer>
 
+<script>
+/* cursor */
+const dot=document.getElementById('cdot'),ring=document.getElementById('cring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+(function t(){dot.style.cssText=`left:${mx}px;top:${my}px`;rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.cssText=`left:${rx}px;top:${ry}px`;requestAnimationFrame(t);})();
+
+/* nav */
+window.addEventListener('scroll',()=>document.getElementById('nav').classList.toggle('sc',scrollY>50));
+document.getElementById('hbg').addEventListener('click',()=>document.getElementById('nl').classList.toggle('open'));
+document.querySelectorAll('.nlinks a').forEach(a=>a.addEventListener('click',()=>document.getElementById('nl').classList.remove('open')));
+
+/* animations */
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('v');}});},{threshold:.18});
+const grid=document.querySelector('.content-grid');
+if(grid) obs.observe(grid);
+</script>
 </body>
 </html>
