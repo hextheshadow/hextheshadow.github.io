@@ -207,6 +207,12 @@ code{font-family:var(--mono);font-size:.8em;color:var(--gdim);}
 .tags{display:flex;flex-wrap:wrap;gap:7px;}
 .tag{font-family:var(--mono);font-size:.62rem;color:var(--gdim);background:rgba(0,255,106,.04);border:1px solid rgba(0,255,106,.12);padding:3px 9px;}
 .tagb{color:var(--bdim);background:rgba(0,200,255,.04);border-color:rgba(0,200,255,.12);}
+.pfoot{display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid var(--bdr);}
+.pwriteup{font-family:var(--mono);font-size:.68rem;color:var(--green);text-decoration:none;letter-spacing:.1em;text-transform:uppercase;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(0,196,80,.35);padding:6px 14px;transition:background .22s,color .22s,gap .2s;cursor:none;}
+.pwriteup:hover{background:var(--green);color:#000;gap:9px;}
+.pwriteup .arr{transition:transform .2s;}
+.pwriteup:hover .arr{transform:translateX(2px);}
+.pyr2{font-family:var(--mono);font-size:.63rem;color:var(--dim);}
 
 /* ── SKILLS ── */
 #skills{background:var(--bg);}
@@ -409,6 +415,10 @@ footer{background:var(--bg);border-top:1px solid var(--bdr);padding:26px 5%;text
       <div class="pdesc">A privacy-focused browser built on the Ladybird open-source engine with thousands of lines of custom C++. The core anti-fingerprinting system generates complete, internally-consistent fake data (canvas fingerprints, WebGL renderers, audio parameters, navigator properties) and prevents site-specific correlation attacks through component-level enforcement.</div>
       <div class="tags">
         <span class="tag">browser internals</span><span class="tag">anti-fingerprinting</span><span class="tag">privacy</span><span class="tag">webgl</span><span class="tag">canvas api</span><span class="tag">audio api</span><span class="tag tagb">navigator spoofing</span><span class="tag tagb">timing attacks</span><span class="tag tagb">ladybird</span>
+      </div>
+      <div class="pfoot">
+        <a href="ladybird.html" class="pwriteup">writeup <span class="arr">→</span></a>
+        <span class="pyr2">2026</span>
       </div>
     </div>
   </div>
