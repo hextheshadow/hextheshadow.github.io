@@ -6,822 +6,288 @@
 <title>hextheshadow — Vulnerability Researcher</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <style>
-  /* ─── RESET & BASE ─── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg:        #070a0d;
-    --bg2:       #0c1117;
-    --bg3:       #111820;
-    --green:     #00ff6a;
-    --green-dim: #00c450;
-    --green-glow:#00ff6a33;
-    --blue:      #00c8ff;
-    --blue-dim:  #0099cc;
-    --blue-glow: #00c8ff22;
-    --text:      #d4e8d4;
-    --text-dim:  #6a8a72;
-    --border:    #1a2e20;
-    --card-bg:   #0d1a12;
-    --font-mono: 'JetBrains Mono', monospace;
-    --font-head: 'Syne', sans-serif;
-    --font-body: 'Outfit', sans-serif;
-  }
-  html { scroll-behavior: smooth; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: 16px;
-    line-height: 1.7;
-    overflow-x: hidden;
-    cursor: none;
-  }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#070a0d;--bg2:#0c1117;--card:#0b1510;
+  --green:#00ff6a;--gdim:#00c450;--gglow:rgba(0,255,106,.15);
+  --blue:#00c8ff;--bdim:#0099cc;
+  --text:#c8ddd0;--dim:#5a7263;
+  --bdr:#182420;
+  --mono:'JetBrains Mono',monospace;
+  --head:'Syne',sans-serif;
+  --body:'Outfit',sans-serif;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.7;overflow-x:hidden;cursor:none;}
 
-  /* ─── CUSTOM CURSOR ─── */
-  .cursor {
-    position: fixed; top: 0; left: 0; z-index: 9999;
-    pointer-events: none;
-  }
-  .cursor-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--green);
-    position: absolute; transform: translate(-50%, -50%);
-    box-shadow: 0 0 8px var(--green);
-    transition: transform 0.05s;
-  }
-  .cursor-ring {
-    width: 30px; height: 30px; border-radius: 50%;
-    border: 1px solid var(--green-dim);
-    position: absolute; transform: translate(-50%, -50%);
-    transition: width 0.2s, height 0.2s, border-color 0.2s;
-    opacity: 0.6;
-  }
-  body:has(a:hover) .cursor-ring,
-  body:has(button:hover) .cursor-ring {
-    width: 44px; height: 44px; border-color: var(--blue);
-  }
+/* scanline */
+body::before{content:'';position:fixed;inset:0;z-index:9997;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);}
 
-  /* ─── SCANLINE OVERLAY ─── */
-  body::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 9998; pointer-events: none;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.04) 2px,
-      rgba(0,0,0,0.04) 4px
-    );
-  }
+/* cursor */
+.cursor{position:fixed;top:0;left:0;z-index:9999;pointer-events:none;}
+.cdot{width:5px;height:5px;border-radius:50%;background:var(--green);position:absolute;transform:translate(-50%,-50%);box-shadow:0 0 7px var(--green);}
+.cring{width:27px;height:27px;border-radius:50%;border:1px solid rgba(0,255,106,.35);position:absolute;transform:translate(-50%,-50%);transition:width .17s,height .17s,border-color .17s;}
+body:has(a:hover) .cring,body:has(button:hover) .cring{width:40px;height:40px;border-color:var(--blue);}
 
-  /* ─── NOISE TEXTURE ─── */
-  body::after {
-    content: '';
-    position: fixed; inset: 0; z-index: 9997; pointer-events: none;
-    opacity: 0.03;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
+/* scrollbar */
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--gdim);}
 
-  /* ─── SCROLLBAR ─── */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--green-dim); border-radius: 2px; }
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;
+  padding:15px 5%;background:rgba(7,10,13,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--bdr);transition:border-color .3s;}
+nav.sc{border-color:rgba(0,196,80,.3);}
+.nlogo{font-family:var(--mono);font-size:.82rem;color:var(--green);text-decoration:none;letter-spacing:.06em;}
+.nlogo em{color:var(--blue);font-style:normal;}
+.nlinks{display:flex;gap:30px;list-style:none;}
+.nlinks a{font-family:var(--mono);font-size:.68rem;color:var(--dim);text-decoration:none;letter-spacing:.12em;text-transform:uppercase;transition:color .2s;position:relative;}
+.nlinks a::after{content:'';position:absolute;left:0;bottom:-3px;width:0;height:1px;background:var(--green);transition:width .3s;}
+.nlinks a:hover{color:var(--green);}
+.nlinks a:hover::after{width:100%;}
+.hbg{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px;}
+.hbg span{display:block;width:22px;height:1.5px;background:var(--green);transition:.3s;}
 
-  /* ─── NAV ─── */
-  nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 18px 5%;
-    background: rgba(7,10,13,0.85);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    transition: border-color 0.3s;
-  }
-  nav.scrolled { border-color: var(--green-dim); }
-  .nav-logo {
-    font-family: var(--font-mono);
-    font-size: 0.9rem;
-    color: var(--green);
-    text-decoration: none;
-    letter-spacing: 0.05em;
-  }
-  .nav-logo span { color: var(--blue); }
-  .nav-links { display: flex; gap: 36px; list-style: none; }
-  .nav-links a {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    text-decoration: none;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition: color 0.2s;
-    position: relative;
-  }
-  .nav-links a::after {
-    content: '';
-    position: absolute; left: 0; bottom: -4px;
-    width: 0; height: 1px;
-    background: var(--green);
-    transition: width 0.3s;
-  }
-  .nav-links a:hover { color: var(--green); }
-  .nav-links a:hover::after { width: 100%; }
-  .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; }
-  .hamburger span { width: 24px; height: 1.5px; background: var(--green); display: block; transition: 0.3s; }
+/* ── HERO ── */
+#hero{min-height:100vh;display:flex;align-items:center;padding:110px 5% 80px;position:relative;overflow:hidden;}
+.hgrid{position:absolute;inset:0;z-index:0;
+  background-image:linear-gradient(rgba(0,255,106,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,106,.022) 1px,transparent 1px);
+  background-size:58px 58px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 20%,transparent 100%);}
+.hamb{position:absolute;top:18%;left:50%;transform:translateX(-50%);width:600px;height:300px;
+  background:radial-gradient(ellipse,var(--gglow) 0%,transparent 70%);pointer-events:none;z-index:0;}
+.hcnt{position:relative;z-index:1;max-width:800px;width:100%;}
 
-  /* ─── HERO ─── */
-  #hero {
-    min-height: 100vh;
-    display: flex; align-items: center;
-    padding: 120px 5% 80px;
-    position: relative;
-    overflow: hidden;
-  }
-  .hero-grid-bg {
-    position: absolute; inset: 0; z-index: 0;
-    background-image:
-      linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
-    background-size: 60px 60px;
-    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
-  }
-  .hero-glow {
-    position: absolute; top: 20%; left: 50%;
-    transform: translateX(-50%);
-    width: 600px; height: 300px;
-    background: radial-gradient(ellipse, var(--green-glow) 0%, transparent 70%);
-    pointer-events: none; z-index: 0;
-  }
-  .hero-content { position: relative; z-index: 1; max-width: 860px; }
-  .hero-tag {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--blue);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 24px;
-    display: flex; align-items: center; gap: 10px;
-    opacity: 0; animation: fadeUp 0.6s 0.2s ease forwards;
-  }
-  .hero-tag::before {
-    content: ''; width: 30px; height: 1px; background: var(--blue);
-  }
-  .hero-name {
-    font-family: var(--font-head);
-    font-size: clamp(3.2rem, 8vw, 7rem);
-    font-weight: 800;
-    line-height: 0.95;
-    letter-spacing: -0.02em;
-    color: #fff;
-    margin-bottom: 16px;
-    opacity: 0; animation: fadeUp 0.7s 0.4s ease forwards;
-  }
-  .hero-name .hs { color: var(--green); text-shadow: 0 0 40px var(--green-glow); }
-  .hero-name .shadow-word { color: var(--text-dim); }
-  .hero-typewriter {
-    font-family: var(--font-mono);
-    font-size: clamp(0.9rem, 2vw, 1.15rem);
-    color: var(--text-dim);
-    margin-bottom: 36px;
-    min-height: 1.5em;
-    opacity: 0; animation: fadeUp 0.7s 0.6s ease forwards;
-  }
-  .hero-typewriter .cursor-blink {
-    display: inline-block;
-    width: 2px; height: 1.1em;
-    background: var(--green);
-    vertical-align: text-bottom;
-    margin-left: 2px;
-    animation: blink 1s step-end infinite;
-  }
-  .hero-desc {
-    font-size: 1.05rem;
-    color: var(--text-dim);
-    max-width: 560px;
-    line-height: 1.8;
-    margin-bottom: 48px;
-    opacity: 0; animation: fadeUp 0.7s 0.8s ease forwards;
-  }
-  .hero-stats {
-    display: flex; gap: 48px; flex-wrap: wrap;
-    margin-bottom: 52px;
-    opacity: 0; animation: fadeUp 0.7s 1s ease forwards;
-  }
-  .stat-item { text-align: left; }
-  .stat-num {
-    font-family: var(--font-head);
-    font-size: 2.4rem;
-    font-weight: 800;
-    color: var(--green);
-    line-height: 1;
-    display: block;
-  }
-  .stat-label {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    display: block;
-    margin-top: 4px;
-  }
-  .hero-cta {
-    display: flex; gap: 16px; flex-wrap: wrap;
-    opacity: 0; animation: fadeUp 0.7s 1.1s ease forwards;
-  }
-  .btn-primary {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    padding: 14px 32px;
-    background: transparent;
-    border: 1px solid var(--green);
-    color: var(--green);
-    text-decoration: none;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    position: relative;
-    overflow: hidden;
-    transition: color 0.3s;
-    cursor: none;
-  }
-  .btn-primary::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: var(--green);
-    transform: translateX(-101%);
-    transition: transform 0.3s ease;
-    z-index: -1;
-  }
-  .btn-primary:hover { color: #000; }
-  .btn-primary:hover::before { transform: translateX(0); }
-  .btn-secondary {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    padding: 14px 32px;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    text-decoration: none;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition: border-color 0.3s, color 0.3s;
-    cursor: none;
-  }
-  .btn-secondary:hover { border-color: var(--blue); color: var(--blue); }
+.heyebrow{font-family:var(--mono);font-size:.7rem;color:var(--blue);letter-spacing:.22em;text-transform:uppercase;
+  display:flex;align-items:center;gap:10px;margin-bottom:20px;
+  opacity:0;animation:fu .6s .15s ease forwards;}
+.heyebrow::before{content:'';width:26px;height:1px;background:var(--blue);}
 
-  /* ─── SECTION BASE ─── */
-  section { padding: 100px 5%; }
-  .section-header { margin-bottom: 64px; }
-  .section-number {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--green);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    display: block;
-    margin-bottom: 10px;
-  }
-  .section-title {
-    font-family: var(--font-head);
-    font-size: clamp(2rem, 5vw, 3.4rem);
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-  }
-  .section-line {
-    width: 60px; height: 2px;
-    background: linear-gradient(90deg, var(--green), var(--blue));
-    margin-top: 20px;
-  }
+.hname{font-family:var(--head);font-size:clamp(2.8rem,9.5vw,6.2rem);font-weight:700;
+  line-height:1;letter-spacing:-.02em;color:#fff;margin-bottom:20px;
+  word-break:break-word;
+  opacity:0;animation:fu .7s .3s ease forwards;}
+.hname .g{color:var(--green);text-shadow:0 0 50px rgba(0,255,106,.25);}
 
-  /* ─── WHOAMI / ABOUT ─── */
-  #about { background: var(--bg2); }
-  .about-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 64px;
-    align-items: start;
-  }
-  .terminal-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-    position: relative;
-  }
-  .terminal-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--green), transparent);
-  }
-  .terminal-bar {
-    display: flex; align-items: center; gap: 8px;
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    background: rgba(0,255,106,0.03);
-  }
-  .t-dot { width: 10px; height: 10px; border-radius: 50%; }
-  .t-dot:nth-child(1) { background: #ff5f57; }
-  .t-dot:nth-child(2) { background: #febc2e; }
-  .t-dot:nth-child(3) { background: #28c840; }
-  .terminal-title {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    margin-left: 8px;
-    flex: 1;
-  }
-  .terminal-body { padding: 24px; }
-  .t-line {
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    line-height: 1.9;
-    display: block;
-    color: var(--text-dim);
-  }
-  .t-prompt { color: var(--green); }
-  .t-cmd { color: var(--blue); }
-  .t-output { color: var(--text); padding-left: 16px; }
-  .t-comment { color: #3a5a40; }
-  .about-text p {
-    font-size: 1.02rem;
-    color: var(--text-dim);
-    line-height: 1.85;
-    margin-bottom: 20px;
-  }
-  .about-text p strong { color: var(--green); font-weight: 500; }
-  .about-links {
-    display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px;
-  }
-  .social-link {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--text-dim);
-    text-decoration: none;
-    padding: 8px 16px;
-    border: 1px solid var(--border);
-    letter-spacing: 0.1em;
-    transition: border-color 0.2s, color 0.2s;
-    cursor: none;
-  }
-  .social-link:hover { border-color: var(--green); color: var(--green); }
+.htw{font-family:var(--mono);font-size:clamp(.8rem,2vw,1.02rem);color:var(--dim);
+  margin-bottom:28px;min-height:1.6em;
+  opacity:0;animation:fu .7s .5s ease forwards;}
+.tb{display:inline-block;width:2px;height:.9em;background:var(--green);vertical-align:middle;margin-left:1px;animation:blink 1s step-end infinite;}
 
-  /* ─── RESEARCH ─── */
-  #research { background: var(--bg); }
-  .research-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 24px;
-  }
-  .research-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    padding: 32px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s, transform 0.3s;
-    cursor: none;
-  }
-  .research-card::before {
-    content: '';
-    position: absolute; left: 0; top: 0; bottom: 0;
-    width: 2px;
-    background: var(--green);
-    transform: scaleY(0);
-    transform-origin: bottom;
-    transition: transform 0.4s ease;
-  }
-  .research-card:hover { border-color: var(--green-dim); transform: translateY(-4px); }
-  .research-card:hover::before { transform: scaleY(1); }
-  .research-card-top {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
-  }
-  .platform-badge {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    padding: 4px 10px;
-    border: 1px solid;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-  .badge-browser { border-color: var(--blue); color: var(--blue); }
-  .badge-web3   { border-color: #a78bfa; color: #a78bfa; }
-  .badge-cli    { border-color: var(--green); color: var(--green); }
-  .badge-sdk    { border-color: #f59e0b; color: #f59e0b; }
-  .severity-pill {
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    padding: 3px 10px;
-    border-radius: 999px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-  .sev-p3   { background: rgba(34,197,94,0.12); color: #4ade80; }
-  .sev-h1   { background: rgba(239,68,68,0.12);  color: #f87171; }
-  .sev-triage { background: rgba(251,191,36,0.12); color: #fbbf24; }
-  .research-target {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    margin-bottom: 10px;
-    letter-spacing: 0.08em;
-  }
-  .research-title {
-    font-family: var(--font-head);
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #fff;
-    line-height: 1.35;
-    margin-bottom: 14px;
-  }
-  .research-desc {
-    font-size: 0.88rem;
-    color: var(--text-dim);
-    line-height: 1.75;
-    margin-bottom: 20px;
-  }
-  .research-footer {
-    display: flex; align-items: center; justify-content: space-between;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-  }
-  .status-dot {
-    display: inline-block;
-    width: 6px; height: 6px; border-radius: 50%;
-    margin-right: 6px;
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green);
-    animation: pulse 2s infinite;
-  }
+.hdesc{font-size:.98rem;color:var(--dim);max-width:510px;line-height:1.85;margin-bottom:42px;
+  opacity:0;animation:fu .7s .65s ease forwards;}
 
-  /* ─── PROJECTS ─── */
-  #projects { background: var(--bg2); }
-  .project-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    overflow: hidden;
-    transition: border-color 0.3s;
-    margin-bottom: 24px;
-  }
-  .project-card:hover { border-color: var(--green-dim); }
-  .project-sidebar {
-    padding: 40px 32px;
-    border-right: 1px solid var(--border);
-    background: rgba(0,255,106,0.02);
-    display: flex; flex-direction: column; gap: 24px;
-  }
-  .project-year {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing: 0.15em;
-  }
-  .project-lang {
-    font-family: var(--font-head);
-    font-size: 2rem;
-    font-weight: 800;
-    color: var(--green);
-    line-height: 1;
-  }
-  .project-scale {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--text-dim);
-    line-height: 1.6;
-  }
-  .project-body { padding: 40px; }
-  .project-title {
-    font-family: var(--font-head);
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -0.01em;
-    margin-bottom: 16px;
-  }
-  .project-desc {
-    font-size: 0.95rem;
-    color: var(--text-dim);
-    line-height: 1.8;
-    margin-bottom: 28px;
-  }
-  .tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
-  .tag {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    color: var(--green-dim);
-    background: rgba(0,255,106,0.06);
-    border: 1px solid rgba(0,255,106,0.15);
-    padding: 4px 10px;
-    letter-spacing: 0.08em;
-    border-radius: 2px;
-  }
-  .tag-blue {
-    color: var(--blue-dim);
-    background: rgba(0,200,255,0.06);
-    border-color: rgba(0,200,255,0.15);
-  }
+.hcta{display:flex;gap:13px;flex-wrap:wrap;opacity:0;animation:fu .7s .8s ease forwards;}
+.btn{font-family:var(--mono);font-size:.73rem;padding:12px 28px;text-decoration:none;letter-spacing:.1em;text-transform:uppercase;transition:.24s;cursor:none;display:inline-block;}
+.btnp{border:1px solid var(--green);color:var(--green);position:relative;overflow:hidden;}
+.btnp::before{content:'';position:absolute;inset:0;background:var(--green);transform:translateX(-101%);transition:transform .27s ease;z-index:-1;}
+.btnp:hover{color:#000;}.btnp:hover::before{transform:translateX(0);}
+.btns{border:1px solid var(--bdr);color:var(--dim);}
+.btns:hover{border-color:var(--blue);color:var(--blue);}
 
-  /* ─── SKILLS ─── */
-  #skills { background: var(--bg); }
-  .skills-layout {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
-  }
-  .skill-group {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    padding: 28px;
-    transition: border-color 0.3s;
-  }
-  .skill-group:hover { border-color: var(--blue-dim); }
-  .skill-group-title {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--blue);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    margin-bottom: 20px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .skill-group-title::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
-  }
-  .skill-item {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(26,46,32,0.6);
-    font-size: 0.88rem;
-    color: var(--text);
-  }
-  .skill-item:last-child { border-bottom: none; }
-  .skill-bar {
-    width: 80px; height: 2px;
-    background: var(--border);
-    border-radius: 1px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .skill-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--green), var(--blue));
-    border-radius: 1px;
-    width: 0;
-    transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
-  }
+/* ── SECTIONS ── */
+section{padding:88px 5%;}
+.sh{margin-bottom:52px;}
+.snum{font-family:var(--mono);font-size:.66rem;color:var(--green);letter-spacing:.2em;text-transform:uppercase;display:block;margin-bottom:9px;}
+.stitle{font-family:var(--head);font-size:clamp(1.7rem,4.2vw,2.8rem);font-weight:700;color:#fff;letter-spacing:-.015em;line-height:1.08;}
+.sline{width:48px;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));margin-top:16px;}
 
-  /* ─── CONTACT ─── */
-  #contact {
-    background: var(--bg2);
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .contact-glow {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 500px; height: 300px;
-    background: radial-gradient(ellipse, rgba(0,200,255,0.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
-  .contact-inner { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; }
-  .contact-pre {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--blue);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 20px;
-  }
-  .contact-title {
-    font-family: var(--font-head);
-    font-size: clamp(2.2rem, 6vw, 4rem);
-    font-weight: 800;
-    color: #fff;
-    line-height: 1;
-    margin-bottom: 20px;
-  }
-  .contact-subtitle {
-    font-size: 1rem;
-    color: var(--text-dim);
-    margin-bottom: 44px;
-    line-height: 1.7;
-  }
-  .contact-links {
-    display: flex; flex-wrap: wrap; gap: 16px; justify-content: center;
-  }
-  .contact-link {
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    color: var(--text);
-    text-decoration: none;
-    padding: 14px 28px;
-    border: 1px solid var(--border);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition: 0.3s;
-    cursor: none;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .contact-link:hover { border-color: var(--green); color: var(--green); }
-  .contact-link.primary { border-color: var(--green); color: var(--green); }
-  .contact-link.primary:hover { background: var(--green); color: #000; }
+/* ── ABOUT ── */
+#about{background:var(--bg2);}
+.agrid{display:grid;grid-template-columns:1fr 1.2fr;gap:52px;align-items:start;}
+.tcard{background:var(--card);border:1px solid var(--bdr);border-radius:5px;overflow:hidden;position:relative;}
+.tcard::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--green),transparent);}
+.tbar{display:flex;align-items:center;gap:7px;padding:12px 16px;border-bottom:1px solid var(--bdr);background:rgba(0,255,106,.02);}
+.tdot{width:9px;height:9px;border-radius:50%;}
+.tdot:nth-child(1){background:#ff5f57;}.tdot:nth-child(2){background:#febc2e;}.tdot:nth-child(3){background:#28c840;}
+.ttitle{font-family:var(--mono);font-size:.66rem;color:var(--dim);margin-left:6px;}
+.tbody{padding:22px 22px 26px;}
+.tl{font-family:var(--mono);font-size:.78rem;line-height:1.95;display:block;color:var(--dim);}
+.tp{color:var(--green);}.tc{color:var(--blue);}.to{color:var(--text);padding-left:14px;}.tcm{color:#2a4030;}
+.aright p{font-size:.97rem;color:var(--dim);line-height:1.88;margin-bottom:17px;}
+.aright strong{color:var(--green);font-weight:500;}
+.socrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;}
+.slink{font-family:var(--mono);font-size:.68rem;color:var(--dim);text-decoration:none;padding:7px 15px;border:1px solid var(--bdr);letter-spacing:.1em;transition:.2s;cursor:none;}
+.slink:hover{border-color:var(--green);color:var(--green);}
 
-  /* ─── FOOTER ─── */
-  footer {
-    background: var(--bg);
-    border-top: 1px solid var(--border);
-    padding: 32px 5%;
-    display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 16px;
-  }
-  .footer-left {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--text-dim);
-  }
-  .footer-left span { color: var(--green); }
-  .footer-right {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    letter-spacing: 0.1em;
-  }
+/* ── RESEARCH ── */
+#research{background:var(--bg);}
+.rcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px;}
+.rcard{background:var(--card);border:1px solid var(--bdr);padding:26px;position:relative;overflow:hidden;transition:border-color .3s,transform .28s;cursor:none;text-decoration:none;display:block;color:inherit;}
+.rcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--green);transform:scaleY(0);transform-origin:bottom;transition:transform .4s ease;}
+.rcard:hover{border-color:rgba(0,196,80,.35);transform:translateY(-3px);}
+.rcard:hover::before{transform:scaleY(1);}
+.rctop{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:15px;}
+.rbadge{font-family:var(--mono);font-size:.6rem;padding:3px 9px;border:1px solid;letter-spacing:.12em;text-transform:uppercase;}
+.rbk{border-color:var(--green);color:var(--green);}
+.rbbr{border-color:var(--blue);color:var(--blue);}
+.rbw3{border-color:#a78bfa;color:#a78bfa;}
+.rbcli{border-color:#f59e0b;color:#f59e0b;}
+.rstatus{font-family:var(--mono);font-size:.58rem;padding:3px 9px;border-radius:999px;letter-spacing:.1em;text-transform:uppercase;}
+.rsc{background:rgba(0,255,106,.07);color:#4ade80;}
+.rst{background:rgba(251,191,36,.07);color:#fbbf24;}
+.rtarget{font-family:var(--mono);font-size:.66rem;color:var(--dim);margin-bottom:8px;}
+.rtitle{font-family:var(--head);font-size:1.08rem;font-weight:700;color:#fff;line-height:1.35;margin-bottom:11px;}
+.rdesc{font-size:.84rem;color:var(--dim);line-height:1.78;margin-bottom:17px;}
+.rfoot{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:.63rem;color:var(--dim);padding-top:13px;border-top:1px solid var(--bdr);}
+.rread{color:var(--green);display:flex;align-items:center;gap:4px;transition:gap .2s;}
+.rcard:hover .rread{gap:8px;}
+.sdot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);animation:pulse 2s infinite;margin-right:5px;}
+code{font-family:var(--mono);font-size:.8em;color:var(--gdim);}
 
-  /* ─── FADE IN (INTERSECTION) ─── */
-  .fade-in {
-    opacity: 0;
-    transform: translateY(28px);
-    transition: opacity 0.8s ease, transform 0.8s ease;
-  }
-  .fade-in.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .fade-in:nth-child(2) { transition-delay: 0.1s; }
-  .fade-in:nth-child(3) { transition-delay: 0.2s; }
-  .fade-in:nth-child(4) { transition-delay: 0.3s; }
+/* ── PROJECTS ── */
+#projects{background:var(--bg2);}
+.pcard{background:var(--card);border:1px solid var(--bdr);display:grid;grid-template-columns:190px 1fr;overflow:hidden;transition:border-color .3s;margin-bottom:18px;}
+.pcard:hover{border-color:rgba(0,196,80,.3);}
+.pside{padding:34px 26px;border-right:1px solid var(--bdr);background:rgba(0,255,106,.012);display:flex;flex-direction:column;gap:18px;}
+.pyr{font-family:var(--mono);font-size:.66rem;color:var(--dim);}
+.plang{font-family:var(--head);font-size:1.8rem;font-weight:700;color:var(--green);line-height:1;}
+.pmeta{font-family:var(--mono);font-size:.68rem;color:var(--dim);line-height:1.65;}
+.pmeta strong{color:var(--text);}
+.pbody{padding:34px;}
+.ptitle{font-family:var(--head);font-size:1.4rem;font-weight:700;color:#fff;letter-spacing:-.01em;margin-bottom:13px;}
+.pdesc{font-size:.92rem;color:var(--dim);line-height:1.82;margin-bottom:22px;}
+.tags{display:flex;flex-wrap:wrap;gap:7px;}
+.tag{font-family:var(--mono);font-size:.62rem;color:var(--gdim);background:rgba(0,255,106,.04);border:1px solid rgba(0,255,106,.12);padding:3px 9px;}
+.tagb{color:var(--bdim);background:rgba(0,200,255,.04);border-color:rgba(0,200,255,.12);}
 
-  /* ─── ANIMATIONS ─── */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(24px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.4; }
-  }
+/* ── SKILLS ── */
+#skills{background:var(--bg);}
+.skgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:18px;}
+.skg{background:var(--card);border:1px solid var(--bdr);padding:24px;transition:border-color .3s;}
+.skg:hover{border-color:rgba(0,200,255,.22);}
+.skh{font-family:var(--mono);font-size:.66rem;color:var(--blue);letter-spacing:.15em;text-transform:uppercase;margin-bottom:17px;display:flex;align-items:center;gap:8px;}
+.skh::after{content:'';flex:1;height:1px;background:var(--bdr);}
+.ski{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(24,36,32,.65);font-size:.84rem;color:var(--text);}
+.ski:last-child{border-bottom:none;}
+.skbar{width:68px;height:2px;background:var(--bdr);flex-shrink:0;}
+.skfill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1);}
 
-  /* ─── MOBILE ─── */
-  @media (max-width: 768px) {
-    .nav-links { display: none; }
-    .hamburger { display: flex; }
-    .nav-links.open {
-      display: flex; flex-direction: column;
-      position: fixed; top: 64px; left: 0; right: 0;
-      background: var(--bg); padding: 24px;
-      border-bottom: 1px solid var(--border);
-      gap: 24px;
-    }
-    .about-grid { grid-template-columns: 1fr; gap: 32px; }
-    .project-card { grid-template-columns: 1fr; }
-    .project-sidebar { border-right: none; border-bottom: 1px solid var(--border); }
-    .hero-stats { gap: 32px; }
-    body { cursor: auto; }
-    .cursor { display: none; }
-  }
+/* ── CONTACT ── */
+#contact{background:var(--bg2);text-align:center;position:relative;overflow:hidden;}
+.cglow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:480px;height:280px;background:radial-gradient(ellipse,rgba(0,200,255,.07) 0%,transparent 70%);pointer-events:none;}
+.cinner{position:relative;z-index:1;max-width:580px;margin:0 auto;}
+.cpre{font-family:var(--mono);font-size:.68rem;color:var(--blue);letter-spacing:.2em;text-transform:uppercase;margin-bottom:16px;}
+.ctitle{font-family:var(--head);font-size:clamp(1.9rem,5vw,3.4rem);font-weight:700;color:#fff;line-height:1;margin-bottom:16px;}
+.ctitle span{color:var(--green);}
+.csub{font-size:.97rem;color:var(--dim);margin-bottom:38px;line-height:1.75;}
+.clinks{display:flex;flex-wrap:wrap;gap:11px;justify-content:center;}
+.clink{font-family:var(--mono);font-size:.72rem;color:var(--text);text-decoration:none;padding:12px 24px;border:1px solid var(--bdr);letter-spacing:.1em;text-transform:uppercase;transition:.24s;cursor:none;}
+.clink:hover{border-color:var(--green);color:var(--green);}
+.clink.pr{border-color:var(--green);color:var(--green);}
+.clink.pr:hover{background:var(--green);color:#000;}
+
+/* ── FOOTER ── */
+footer{background:var(--bg);border-top:1px solid var(--bdr);padding:26px 5%;text-align:center;}
+.finner{display:flex;flex-direction:column;align-items:center;gap:7px;}
+.fbrand{font-family:var(--mono);font-size:.76rem;color:var(--dim);}
+.fbrand span{color:var(--green);}
+.fsub{font-family:var(--mono);font-size:.63rem;color:var(--dim);letter-spacing:.1em;}
+
+/* ── FADE IN ── */
+.fi{opacity:0;transform:translateY(22px);transition:opacity .72s ease,transform .72s ease;}
+.fi.v{opacity:1;transform:translateY(0);}
+.fi:nth-child(2){transition-delay:.08s;}.fi:nth-child(3){transition-delay:.16s;}.fi:nth-child(4){transition-delay:.24s;}
+
+/* ── KEYFRAMES ── */
+@keyframes fu{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .agrid{grid-template-columns:1fr;gap:30px;}
+  .pcard{grid-template-columns:1fr;}
+  .pside{border-right:none;border-bottom:1px solid var(--bdr);flex-direction:row;flex-wrap:wrap;gap:14px;padding:22px;}
+}
+@media(max-width:680px){
+  .nlinks{display:none;}
+  .hbg{display:flex;}
+  .nlinks.open{display:flex;flex-direction:column;position:fixed;top:55px;left:0;right:0;background:rgba(7,10,13,.97);padding:22px;border-bottom:1px solid var(--bdr);gap:20px;z-index:999;}
+  nav{padding:13px 5%;}
+  section{padding:65px 5%;}
+  .rcards{grid-template-columns:1fr;}
+  .skgrid{grid-template-columns:1fr;}
+  .pbody{padding:22px;}
+  .clinks{gap:9px;}
+  .clink{padding:10px 16px;font-size:.66rem;}
+  body{cursor:auto;}.cursor{display:none;}
+}
+@media(max-width:380px){
+  .hname{font-size:clamp(2.3rem,12vw,2.8rem);}
+  .btn{padding:11px 20px;font-size:.7rem;}
+}
 </style>
 </head>
 <body>
 
-<!-- CURSOR -->
-<div class="cursor" id="cursor">
-  <div class="cursor-ring" id="cursorRing"></div>
-  <div class="cursor-dot" id="cursorDot"></div>
-</div>
+<div class="cursor"><div class="cring" id="cring"></div><div class="cdot" id="cdot"></div></div>
 
-<!-- NAV -->
-<nav id="navbar">
-  <a href="#hero" class="nav-logo"><span>~/</span>hextheshadow</a>
-  <ul class="nav-links" id="navLinks">
+<nav id="nav">
+  <a href="#hero" class="nlogo"><em>~/</em>hextheshadow</a>
+  <ul class="nlinks" id="nl">
     <li><a href="#about">whoami</a></li>
     <li><a href="#research">research</a></li>
     <li><a href="#projects">projects</a></li>
     <li><a href="#skills">skills</a></li>
     <li><a href="#contact">contact</a></li>
   </ul>
-  <div class="hamburger" id="hamburger">
-    <span></span><span></span><span></span>
-  </div>
+  <div class="hbg" id="hbg"><span></span><span></span><span></span></div>
 </nav>
 
 <!-- HERO -->
 <section id="hero">
-  <div class="hero-grid-bg"></div>
-  <div class="hero-glow"></div>
-  <div class="hero-content">
-    <div class="hero-tag">vulnerability researcher</div>
-    <h1 class="hero-name">
-      <span class="hs">hex</span><span class="shadow-word">the</span><span class="hs">shadow</span>
-    </h1>
-    <div class="hero-typewriter">
-      <span id="typewriterText"></span><span class="cursor-blink"></span>
-    </div>
-    <p class="hero-desc">
-      Independent vulnerability researcher operating at the intersection of browser internals,
-      sandbox security, and AI-autonomous pipelines. Finding what others miss.
-    </p>
-    <div class="hero-stats">
-      <div class="stat-item">
-        <span class="stat-num">4+</span>
-        <span class="stat-label">confirmed findings</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-num">10K+</span>
-        <span class="stat-label">lines of C++</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-num">3+</span>
-        <span class="stat-label">platforms targeted</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-num">2026</span>
-        <span class="stat-label">all active</span>
-      </div>
-    </div>
-    <div class="hero-cta">
-      <a href="#research" class="btn-primary">view research</a>
-      <a href="#contact" class="btn-secondary">get in touch</a>
+  <div class="hgrid"></div>
+  <div class="hamb"></div>
+  <div class="hcnt">
+    <div class="heyebrow">vulnerability researcher</div>
+    <h1 class="hname"><span class="g">hex</span>the<span class="g">shadow</span></h1>
+    <div class="htw"><span id="twt"></span><span class="tb"></span></div>
+    <p class="hdesc">Independent researcher at the intersection of browser internals, Linux kernel security, and AI-autonomous exploit pipelines. Finding what others miss.</p>
+    <div class="hcta">
+      <a href="#research" class="btn btnp">view research</a>
+      <a href="#contact" class="btn btns">get in touch</a>
     </div>
   </div>
 </section>
 
-<!-- WHOAMI / ABOUT -->
+<!-- ABOUT -->
 <section id="about">
-  <div class="section-header fade-in">
-    <span class="section-number">00 — whoami</span>
-    <h2 class="section-title">About Me</h2>
-    <div class="section-line"></div>
-  </div>
-  <div class="about-grid">
-    <div class="terminal-card fade-in">
-      <div class="terminal-bar">
-        <div class="t-dot"></div>
-        <div class="t-dot"></div>
-        <div class="t-dot"></div>
-        <span class="terminal-title">whoami.sh</span>
-      </div>
-      <div class="terminal-body">
-        <span class="t-line"><span class="t-prompt">$ </span><span class="t-cmd">whoami</span></span>
-        <span class="t-line t-output">hextheshadow</span>
-        <span class="t-line">&nbsp;</span>
-        <span class="t-line"><span class="t-prompt">$ </span><span class="t-cmd">cat role.txt</span></span>
-        <span class="t-line t-output">Independent Vulnerability Researcher</span>
-        <span class="t-line">&nbsp;</span>
-        <span class="t-line"><span class="t-prompt">$ </span><span class="t-cmd">ls ./focus/</span></span>
-        <span class="t-line t-output">browser-internals/</span>
-        <span class="t-line t-output">linux-kernel/</span>
-        <span class="t-line t-output">hypervisors/</span>
-        <span class="t-line t-output">sandbox-escapes/</span>
-        <span class="t-line t-output">ai-autonomous-pipelines/</span>
-        <span class="t-line">&nbsp;</span>
-        <span class="t-line"><span class="t-prompt">$ </span><span class="t-cmd">cat platforms.txt</span></span>
-        <span class="t-line t-output">HackerOne  · h3xb1tx</span>
-        <span class="t-line t-output">Bugcrowd   · HexShadow</span>
-        <span class="t-line t-output">GitHub     · hextheshadow</span>
-        <span class="t-line">&nbsp;</span>
-        <span class="t-line t-comment"># Currently: all research active &amp; ongoing</span>
+  <div class="sh fi"><span class="snum">00 — whoami</span><h2 class="stitle">About Me</h2><div class="sline"></div></div>
+  <div class="agrid">
+    <div class="tcard fi">
+      <div class="tbar"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div><span class="ttitle">whoami.sh</span></div>
+      <div class="tbody">
+        <span class="tl"><span class="tp">$ </span><span class="tc">whoami</span></span>
+        <span class="tl to">hextheshadow</span>
+        <span class="tl">&nbsp;</span>
+        <span class="tl"><span class="tp">$ </span><span class="tc">cat role.txt</span></span>
+        <span class="tl to">Independent Vulnerability Researcher</span>
+        <span class="tl">&nbsp;</span>
+        <span class="tl"><span class="tp">$ </span><span class="tc">ls ./focus/</span></span>
+        <span class="tl to">browser-internals/</span>
+        <span class="tl to">linux-kernel/</span>
+        <span class="tl to">hypervisors/</span>
+        <span class="tl to">sandbox-escapes/</span>
+        <span class="tl to">ai-autonomous-pipelines/</span>
+        <span class="tl">&nbsp;</span>
+        <span class="tl"><span class="tp">$ </span><span class="tc">cat contact.txt</span></span>
+        <span class="tl to">github  · hextheshadow</span>
+        <span class="tl to">linkedin· haris-hussain</span>
+        <span class="tl to">email   · hextheshadow0x</span>
+        <span class="tl">&nbsp;</span>
+        <span class="tl tcm"># research: all active · 2026</span>
       </div>
     </div>
-    <div class="about-text fade-in">
-      <p>
-        I'm an independent security researcher focused on <strong>browser internals, Linux kernel exploits, hypervisor security</strong>, and open-source project auditing. I operate fully autonomous AI research pipelines that handle codebase mapping, trust boundary analysis, attack surface enumeration, and automated PoC generation — with manual validation and dynamic instrumentation confirming every finding before responsible disclosure.
-      </p>
-      <p>
-        My work spans <strong>Chromium</strong>, <strong>MetaMask</strong>, <strong>Doppler</strong>, <strong>Immutable Passport</strong>, and other high-impact targets. I specialize in uncovering logic flaws and policy bypass vulnerabilities that automated scanners consistently miss.
-      </p>
-      <p>
-        Beyond research, I build privacy infrastructure — including a <strong>10,000+ line C++ anti-fingerprinting engine</strong> for the Ladybird browser that operates at component level with full platform coherence enforcement.
-      </p>
-      <div class="about-links">
-        <a href="https://github.com/hextheshadow" target="_blank" class="social-link">github</a>
-        <a href="https://hackerone.com/h3xb1tx" target="_blank" class="social-link">hackerone</a>
-        <a href="https://bugcrowd.com/h/HexShadow" target="_blank" class="social-link">bugcrowd</a>
-        <a href="mailto:hextheshadow0x@gmail.com" class="social-link">email</a>
+    <div class="aright fi">
+      <p>I'm an independent security researcher focused on <strong>browser internals, Linux kernel exploits, hypervisor security</strong>, and open-source project auditing. I operate AI-autonomous research pipelines that handle codebase mapping, trust boundary analysis, attack surface enumeration, and automated PoC generation — with manual validation and dynamic instrumentation confirming every finding before responsible disclosure.</p>
+      <p>My work spans <strong>Chromium, MetaMask, Doppler, Immutable Passport</strong>, and other high-impact targets. I specialize in uncovering logic flaws and policy bypass vulnerabilities that automated scanners consistently miss.</p>
+      <p>Beyond research, I build privacy infrastructure — including a C++ anti-fingerprinting engine for the Ladybird browser that operates at the component level with full platform coherence enforcement.</p>
+      <div class="socrow">
+        <a href="https://github.com/hextheshadow" target="_blank" class="slink">github</a>
+        <a href="https://www.linkedin.com/in/haris-hussain-42b93138a" target="_blank" class="slink">linkedin</a>
+        <a href="mailto:hextheshadow0x@gmail.com" class="slink">email</a>
       </div>
     </div>
   </div>
@@ -829,75 +295,39 @@
 
 <!-- RESEARCH -->
 <section id="research">
-  <div class="section-header fade-in">
-    <span class="section-number">01 — research findings</span>
-    <h2 class="section-title">Confirmed Vulnerabilities</h2>
-    <div class="section-line"></div>
-  </div>
-  <div class="research-grid">
+  <div class="sh fi"><span class="snum">01 — research</span><h2 class="stitle">Research Findings</h2><div class="sline"></div></div>
+  <div class="rcards">
 
-    <div class="research-card fade-in">
-      <div class="research-card-top">
-        <span class="platform-badge badge-browser">browser</span>
-        <span class="severity-pill sev-p3">P3 · Privacy</span>
-      </div>
-      <div class="research-target">Chromium / Fenced Frames</div>
-      <div class="research-title">ACER Policy Bypass via Missing Cross-Origin Check</div>
-      <div class="research-desc">
-        Missing <code>allow_cross_origin_event_reporting</code> check in <code>SetFencedFrameAutomaticBeaconReportEventData()</code> allows cross-origin child iframes to register and fire automatic beacons across the ACER boundary without operator opt-in. AI pipeline traced enforcement path in <code>render_frame_host_impl.cc</code> and generated a working PoC confirmed on stable channel.
-      </div>
-      <div class="research-footer">
-        <span><span class="status-dot"></span>confirmed · 2026</span>
-        <span>chromium</span>
-      </div>
+    <a href="vsock-uaf.html" class="rcard fi">
+      <div class="rctop"><span class="rbadge rbk">Linux Kernel</span><span class="rstatus rsc">Confirmed</span></div>
+      <div class="rtarget">linux-6.12.79 · net/vmw_vsock · kernelCTF</div>
+      <div class="rtitle">Use-After-Free in vsock Loopback Transport</div>
+      <div class="rdesc">KASAN-silent UAF write+read in <code>virtio_transport_consume_skb_sent()</code> triggered by a race between the loopback workqueue and socket teardown. Yields a controlled subtraction primitive on a freed <code>size_t</code> and exposes raw kernel text/data pointers.</div>
+      <div class="rfoot"><span><span class="sdot"></span>2026 · UAF Write + Read · kmalloc-96</span><span class="rread">read writeup →</span></div>
+    </a>
+
+    <div class="rcard fi">
+      <div class="rctop"><span class="rbadge rbbr">Browser</span><span class="rstatus rsc">P3 · Privacy</span></div>
+      <div class="rtarget">Chromium / Fenced Frames</div>
+      <div class="rtitle">ACER Policy Bypass via Missing Cross-Origin Check</div>
+      <div class="rdesc">Missing <code>allow_cross_origin_event_reporting</code> check in <code>SetFencedFrameAutomaticBeaconReportEventData()</code> allows cross-origin child iframes to register and fire automatic beacons across the ACER boundary without operator opt-in.</div>
+      <div class="rfoot"><span><span class="sdot"></span>2026 · Chromium</span><span style="color:var(--dim)">writeup coming</span></div>
     </div>
 
-    <div class="research-card fade-in">
-      <div class="research-card-top">
-        <span class="platform-badge badge-web3">web3</span>
-        <span class="severity-pill sev-h1">HackerOne</span>
-      </div>
-      <div class="research-target">MetaMask Snaps</div>
-      <div class="research-title">SES Compartment Sandbox Escape via Thenable Hijack</div>
-      <div class="research-desc">
-        Zero-permission sandbox escape via thenable hijack in <code>BaseSnapExecutor.#registerSnapExports()</code>. Snap-controlled <code>.then()</code> fires as outer-realm microtask, bypassing SES entirely and exposing real <code>globalThis</code> plus the Ethereum provider. AI mapped the SES compartment boundary and identified the microtask scheduling gap outside the <code>#executeInSnapContext</code> guard.
-      </div>
-      <div class="research-footer">
-        <span><span class="status-dot"></span>validated · 2026</span>
-        <span>metamask</span>
-      </div>
+    <div class="rcard fi">
+      <div class="rctop"><span class="rbadge rbw3">Web3</span><span class="rstatus rsc">HackerOne</span></div>
+      <div class="rtarget">MetaMask Snaps</div>
+      <div class="rtitle">SES Compartment Sandbox Escape via Thenable Hijack</div>
+      <div class="rdesc">Zero-permission sandbox escape in <code>BaseSnapExecutor.#registerSnapExports()</code>. Snap-controlled <code>.then()</code> fires as outer-realm microtask, bypassing SES entirely and exposing real <code>globalThis</code> and the Ethereum provider.</div>
+      <div class="rfoot"><span><span class="sdot"></span>2026 · MetaMask</span><span style="color:var(--dim)">writeup coming</span></div>
     </div>
 
-    <div class="research-card fade-in">
-      <div class="research-card-top">
-        <span class="platform-badge badge-cli">cli · devops</span>
-        <span class="severity-pill sev-triage">In Triage</span>
-      </div>
-      <div class="research-target">Doppler CLI</div>
-      <div class="research-title">Auth Token Exfiltration via DOPPLER_API_HOST Injection</div>
-      <div class="research-desc">
-        <code>PrepareSecrets()</code> blocks only <code>PATH</code>, <code>PS1</code>, <code>HOME</code> — leaving <code>DOPPLER_API_HOST</code> injectable. A malicious team member can redirect <code>doppler run</code> to an attacker-controlled server, leaking the victim's Bearer token. AI audited the full config chain across <code>config.go</code>, <code>http.go</code>, and <code>api.go</code>.
-      </div>
-      <div class="research-footer">
-        <span><span class="status-dot"></span>in triage · 2026</span>
-        <span>doppler</span>
-      </div>
-    </div>
-
-    <div class="research-card fade-in">
-      <div class="research-card-top">
-        <span class="platform-badge badge-sdk">web3 · sdk</span>
-        <span class="severity-pill sev-h1">Bugcrowd</span>
-      </div>
-      <div class="research-target">Immutable Passport SDK</div>
-      <div class="research-title">Silent Arbitrary Transaction Execution via apiUrl Injection</div>
-      <div class="research-desc">
-        Unauthenticated session activity endpoint allows silent arbitrary transaction execution via attacker-controlled <code>apiUrl</code> in Passport SDK custom chain configuration. Identified through AI-assisted API flow analysis with impact manually confirmed through dynamic instrumentation.
-      </div>
-      <div class="research-footer">
-        <span><span class="status-dot"></span>submitted · 2026</span>
-        <span>immutable</span>
-      </div>
+    <div class="rcard fi">
+      <div class="rctop"><span class="rbadge rbcli">CLI · DevOps</span><span class="rstatus rst">In Triage</span></div>
+      <div class="rtarget">Doppler CLI</div>
+      <div class="rtitle">Auth Token Exfiltration via DOPPLER_API_HOST Injection</div>
+      <div class="rdesc"><code>PrepareSecrets()</code> blocks only <code>PATH</code>, <code>PS1</code>, <code>HOME</code> — leaving <code>DOPPLER_API_HOST</code> injectable. A malicious team member can redirect <code>doppler run</code> to an attacker-controlled server, leaking Bearer tokens.</div>
+      <div class="rfoot"><span><span class="sdot"></span>2026 · Doppler</span><span style="color:var(--dim)">writeup coming</span></div>
     </div>
 
   </div>
@@ -905,39 +335,18 @@
 
 <!-- PROJECTS -->
 <section id="projects">
-  <div class="section-header fade-in">
-    <span class="section-number">02 — projects</span>
-    <h2 class="section-title">Built Things</h2>
-    <div class="section-line"></div>
-  </div>
-
-  <div class="project-card fade-in">
-    <div class="project-sidebar">
-      <div class="project-year">2026</div>
-      <div class="project-lang">C++</div>
-      <div class="project-scale">
-        <strong style="color:var(--text)">10,000+</strong><br>lines of custom code<br><br>
-        <strong style="color:var(--text)">Ladybird</strong><br>base engine<br><br>
-        <strong style="color:var(--text)">Component-level</strong><br>enforcement
-      </div>
+  <div class="sh fi"><span class="snum">02 — projects</span><h2 class="stitle">Built Things</h2><div class="sline"></div></div>
+  <div class="pcard fi">
+    <div class="pside">
+      <div class="pyr">2026</div>
+      <div class="plang">C++</div>
+      <div class="pmeta"><strong>Ladybird</strong><br>base engine<br><br><strong>Component-level</strong><br>enforcement</div>
     </div>
-    <div class="project-body">
-      <div class="project-title">Ladybird Anti-Fingerprinting Engine</div>
-      <div class="project-desc">
-        A privacy-focused browser built on the Ladybird open-source engine with 10,000+ lines of custom C++. The core anti-fingerprinting system generates complete, internally consistent hardware and software device identities enforced directly at the C++ component level — not a JavaScript patch layer, which is trivially detectable by any modern fingerprinting script.
-        <br><br>
-        Platform constraints are hard-enforced: Windows profiles use ANGLE/D3D GPUs, macOS uses Apple Silicon/Metal, iOS uses Apple SoC with no discrete GPU, Linux uses Mesa DRI. Cross-platform contamination is explicitly blocked. Covers the full fingerprinting surface: audio, canvas, WebGL, navigator, geolocation, high-resolution timing, workers, UI events, clipboard, and GPC.
-      </div>
-      <div class="tag-row">
-        <span class="tag">browser internals</span>
-        <span class="tag">anti-fingerprinting</span>
-        <span class="tag">privacy</span>
-        <span class="tag">webgl</span>
-        <span class="tag">canvas api</span>
-        <span class="tag">audio api</span>
-        <span class="tag tag-blue">navigator spoofing</span>
-        <span class="tag tag-blue">timing attacks</span>
-        <span class="tag tag-blue">ladybird</span>
+    <div class="pbody">
+      <div class="ptitle">Ladybird Anti-Fingerprinting Engine</div>
+      <div class="pdesc">A privacy-focused browser built on the Ladybird open-source engine with thousands of lines of custom C++. The core anti-fingerprinting system generates complete, internally consistent hardware and software device identities enforced directly at the C++ component level — not a JavaScript patch layer, which is trivially detectable by any modern fingerprinting script.<br><br>Platform constraints are hard-enforced: Windows profiles use ANGLE/D3D GPUs, macOS uses Apple Silicon/Metal, iOS uses Apple SoC with no discrete GPU, Linux uses Mesa DRI. Cross-platform contamination explicitly blocked. Full surface coverage: audio, canvas, WebGL, navigator, geolocation, high-resolution timing, workers, UI events, clipboard, and GPC.</div>
+      <div class="tags">
+        <span class="tag">browser internals</span><span class="tag">anti-fingerprinting</span><span class="tag">privacy</span><span class="tag">webgl</span><span class="tag">canvas api</span><span class="tag">audio api</span><span class="tag tagb">navigator spoofing</span><span class="tag tagb">timing attacks</span><span class="tag tagb">ladybird</span>
       </div>
     </div>
   </div>
@@ -945,147 +354,90 @@
 
 <!-- SKILLS -->
 <section id="skills">
-  <div class="section-header fade-in">
-    <span class="section-number">03 — skills</span>
-    <h2 class="section-title">Technical Arsenal</h2>
-    <div class="section-line"></div>
-  </div>
-  <div class="skills-layout">
-
-    <div class="skill-group fade-in">
-      <div class="skill-group-title">vulnerability research</div>
-      <div class="skill-item">Browser Internals <div class="skill-bar"><div class="skill-fill" data-width="95"></div></div></div>
-      <div class="skill-item">Sandbox Escapes <div class="skill-bar"><div class="skill-fill" data-width="90"></div></div></div>
-      <div class="skill-item">Memory Corruption <div class="skill-bar"><div class="skill-fill" data-width="82"></div></div></div>
-      <div class="skill-item">IPC Security <div class="skill-bar"><div class="skill-fill" data-width="88"></div></div></div>
-      <div class="skill-item">Linux Kernel <div class="skill-bar"><div class="skill-fill" data-width="78"></div></div></div>
-      <div class="skill-item">Hypervisors <div class="skill-bar"><div class="skill-fill" data-width="72"></div></div></div>
+  <div class="sh fi"><span class="snum">03 — skills</span><h2 class="stitle">Technical Arsenal</h2><div class="sline"></div></div>
+  <div class="skgrid">
+    <div class="skg fi">
+      <div class="skh">vulnerability research</div>
+      <div class="ski">Browser Internals<div class="skbar"><div class="skfill" data-w="95"></div></div></div>
+      <div class="ski">Sandbox Escapes<div class="skbar"><div class="skfill" data-w="90"></div></div></div>
+      <div class="ski">Memory Corruption<div class="skbar"><div class="skfill" data-w="83"></div></div></div>
+      <div class="ski">IPC Security<div class="skbar"><div class="skfill" data-w="87"></div></div></div>
+      <div class="ski">Linux Kernel<div class="skbar"><div class="skfill" data-w="80"></div></div></div>
+      <div class="ski">Hypervisors<div class="skbar"><div class="skfill" data-w="73"></div></div></div>
     </div>
-
-    <div class="skill-group fade-in">
-      <div class="skill-group-title">ai-autonomous pipelines</div>
-      <div class="skill-item">Codebase Mapping <div class="skill-bar"><div class="skill-fill" data-width="95"></div></div></div>
-      <div class="skill-item">Attack Surface Enum <div class="skill-bar"><div class="skill-fill" data-width="93"></div></div></div>
-      <div class="skill-item">Automated PoC Gen <div class="skill-bar"><div class="skill-fill" data-width="88"></div></div></div>
-      <div class="skill-item">Trust Boundary Analysis <div class="skill-bar"><div class="skill-fill" data-width="90"></div></div></div>
-      <div class="skill-item">Exploitability Validation <div class="skill-bar"><div class="skill-fill" data-width="92"></div></div></div>
+    <div class="skg fi">
+      <div class="skh">ai-autonomous pipelines</div>
+      <div class="ski">Codebase Mapping<div class="skbar"><div class="skfill" data-w="95"></div></div></div>
+      <div class="ski">Attack Surface Enum<div class="skbar"><div class="skfill" data-w="93"></div></div></div>
+      <div class="ski">Automated PoC Gen<div class="skbar"><div class="skfill" data-w="88"></div></div></div>
+      <div class="ski">Trust Boundary Analysis<div class="skbar"><div class="skfill" data-w="90"></div></div></div>
+      <div class="ski">Exploitability Validation<div class="skbar"><div class="skfill" data-w="92"></div></div></div>
     </div>
-
-    <div class="skill-group fade-in">
-      <div class="skill-group-title">dynamic analysis</div>
-      <div class="skill-item">ASAN / TSAN / KASAN <div class="skill-bar"><div class="skill-fill" data-width="90"></div></div></div>
-      <div class="skill-item">GDB / objdump <div class="skill-bar"><div class="skill-fill" data-width="88"></div></div></div>
-      <div class="skill-item">strace / ltrace <div class="skill-bar"><div class="skill-fill" data-width="85"></div></div></div>
-      <div class="skill-item">ftrace / perf <div class="skill-bar"><div class="skill-fill" data-width="80"></div></div></div>
-      <div class="skill-item">Crash Dump Analysis <div class="skill-bar"><div class="skill-fill" data-width="87"></div></div></div>
+    <div class="skg fi">
+      <div class="skh">dynamic analysis</div>
+      <div class="ski">ASAN / TSAN / KASAN<div class="skbar"><div class="skfill" data-w="90"></div></div></div>
+      <div class="ski">GDB / objdump<div class="skbar"><div class="skfill" data-w="88"></div></div></div>
+      <div class="ski">strace / ltrace<div class="skbar"><div class="skfill" data-w="85"></div></div></div>
+      <div class="ski">ftrace / perf<div class="skbar"><div class="skfill" data-w="79"></div></div></div>
+      <div class="ski">Crash Dump Analysis<div class="skbar"><div class="skfill" data-w="86"></div></div></div>
     </div>
-
-    <div class="skill-group fade-in">
-      <div class="skill-group-title">languages &amp; platforms</div>
-      <div class="skill-item">C / C++ <div class="skill-bar"><div class="skill-fill" data-width="95"></div></div></div>
-      <div class="skill-item">Python <div class="skill-bar"><div class="skill-fill" data-width="82"></div></div></div>
-      <div class="skill-item">Linux (Arch, Ubuntu) <div class="skill-bar"><div class="skill-fill" data-width="92"></div></div></div>
-      <div class="skill-item">x86-64 <div class="skill-bar"><div class="skill-fill" data-width="88"></div></div></div>
-      <div class="skill-item">Chromium Internals <div class="skill-bar"><div class="skill-fill" data-width="90"></div></div></div>
+    <div class="skg fi">
+      <div class="skh">languages &amp; platforms</div>
+      <div class="ski">C / C++<div class="skbar"><div class="skfill" data-w="95"></div></div></div>
+      <div class="ski">Python<div class="skbar"><div class="skfill" data-w="82"></div></div></div>
+      <div class="ski">Linux (Arch, Ubuntu)<div class="skbar"><div class="skfill" data-w="92"></div></div></div>
+      <div class="ski">x86-64<div class="skbar"><div class="skfill" data-w="88"></div></div></div>
+      <div class="ski">Chromium Internals<div class="skbar"><div class="skfill" data-w="90"></div></div></div>
     </div>
-
   </div>
 </section>
 
 <!-- CONTACT -->
 <section id="contact">
-  <div class="contact-glow"></div>
-  <div class="contact-inner">
-    <div class="contact-pre fade-in">04 — contact</div>
-    <h2 class="contact-title fade-in">Let's Talk<br><span style="color:var(--green)">Security.</span></h2>
-    <p class="contact-subtitle fade-in">
-      Open to bug bounty collabs, research discussions, and responsible disclosure inquiries.
-      Reach out through any of the channels below.
-    </p>
-    <div class="contact-links fade-in">
-      <a href="mailto:hextheshadow0x@gmail.com" class="contact-link primary">✉ email me</a>
-      <a href="https://hackerone.com/h3xb1tx" target="_blank" class="contact-link">hackerone</a>
-      <a href="https://bugcrowd.com/h/HexShadow" target="_blank" class="contact-link">bugcrowd</a>
-      <a href="https://github.com/hextheshadow" target="_blank" class="contact-link">github</a>
+  <div class="cglow"></div>
+  <div class="cinner">
+    <div class="cpre fi">04 — contact</div>
+    <h2 class="ctitle fi">Let's Talk<br><span>Security.</span></h2>
+    <p class="csub fi">Open to research discussions, bug bounty collaborations,<br>and responsible disclosure inquiries.</p>
+    <div class="clinks fi">
+      <a href="mailto:hextheshadow0x@gmail.com" class="clink pr">✉ email</a>
+      <a href="https://github.com/hextheshadow" target="_blank" class="clink">github</a>
+      <a href="https://www.linkedin.com/in/haris-hussain-42b93138a" target="_blank" class="clink">linkedin</a>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
 <footer>
-  <div class="footer-left">
-    <span>~/hextheshadow</span> · vulnerability researcher · 2026
+  <div class="finner">
+    <div class="fbrand"><span>~/hextheshadow</span> · vulnerability researcher · 2026</div>
+    <div class="fsub">built with intent. all research active.</div>
   </div>
-  <div class="footer-right">built with intent. all research active.</div>
 </footer>
 
 <script>
-  /* ─── CURSOR ─── */
-  const dot  = document.getElementById('cursorDot');
-  const ring = document.getElementById('cursorRing');
-  let mx = 0, my = 0, rx = 0, ry = 0;
-  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
-  (function animateCursor() {
-    dot.style.left  = mx + 'px';
-    dot.style.top   = my + 'px';
-    rx += (mx - rx) * 0.12;
-    ry += (my - ry) * 0.12;
-    ring.style.left = rx + 'px';
-    ring.style.top  = ry + 'px';
-    requestAnimationFrame(animateCursor);
-  })();
+/* cursor */
+const dot=document.getElementById('cdot'),ring=document.getElementById('cring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+(function t(){dot.style.cssText=`left:${mx}px;top:${my}px`;rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.cssText=`left:${rx}px;top:${ry}px`;requestAnimationFrame(t);})();
 
-  /* ─── NAV SCROLL ─── */
-  window.addEventListener('scroll', () => {
-    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 60);
-  });
+/* nav */
+window.addEventListener('scroll',()=>document.getElementById('nav').classList.toggle('sc',scrollY>50));
+document.getElementById('hbg').addEventListener('click',()=>document.getElementById('nl').classList.toggle('open'));
+document.querySelectorAll('.nlinks a').forEach(a=>a.addEventListener('click',()=>document.getElementById('nl').classList.remove('open')));
 
-  /* ─── HAMBURGER ─── */
-  document.getElementById('hamburger').addEventListener('click', () => {
-    document.getElementById('navLinks').classList.toggle('open');
-  });
-  document.querySelectorAll('.nav-links a').forEach(a => {
-    a.addEventListener('click', () => document.getElementById('navLinks').classList.remove('open'));
-  });
+/* typewriter */
+const phrases=['Browser internals researcher.','Linux kernel exploit dev.','AI-autonomous exploit pipelines.','Finding what scanners miss.','Responsible disclosure.'];
+let pi=0,ci=0,del=false;const tw=document.getElementById('twt');
+function type(){const p=phrases[pi];
+  if(!del){tw.textContent=p.slice(0,++ci);if(ci===p.length){del=true;setTimeout(type,1800);return;}}
+  else{tw.textContent=p.slice(0,--ci);if(ci===0){del=false;pi=(pi+1)%phrases.length;setTimeout(type,280);return;}}
+  setTimeout(type,del?37:63);}
+setTimeout(type,1100);
 
-  /* ─── TYPEWRITER ─── */
-  const phrases = [
-    'Browser internals researcher.',
-    'Sandbox escape specialist.',
-    'AI-autonomous exploit pipelines.',
-    'Finding what scanners miss.',
-    'Responsible disclosure advocate.',
-  ];
-  let pi = 0, ci = 0, deleting = false;
-  const el = document.getElementById('typewriterText');
-  function typewrite() {
-    const phrase = phrases[pi];
-    if (!deleting) {
-      el.textContent = phrase.slice(0, ci + 1);
-      ci++;
-      if (ci === phrase.length) { deleting = true; setTimeout(typewrite, 1800); return; }
-    } else {
-      el.textContent = phrase.slice(0, ci - 1);
-      ci--;
-      if (ci === 0) { deleting = false; pi = (pi + 1) % phrases.length; setTimeout(typewrite, 300); return; }
-    }
-    setTimeout(typewrite, deleting ? 40 : 65);
-  }
-  setTimeout(typewrite, 1400);
-
-  /* ─── INTERSECTION OBSERVER (fade-in + skill bars) ─── */
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        entry.target.querySelectorAll('.skill-fill').forEach(bar => {
-          bar.style.width = bar.dataset.width + '%';
-        });
-      }
-    });
-  }, { threshold: 0.12 });
-
-  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+/* intersection observer */
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('v');e.target.querySelectorAll('.skfill').forEach(b=>b.style.width=b.dataset.w+'%');}});},{threshold:.1});
+document.querySelectorAll('.fi').forEach(el=>obs.observe(el));
 </script>
 </body>
 </html>
