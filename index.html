@@ -57,14 +57,15 @@ nav.sc{border-color:rgba(0,196,80,.3);}
   mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 20%,transparent 100%);}
 .hamb{position:absolute;top:18%;left:50%;transform:translateX(-50%);width:600px;height:300px;
   background:radial-gradient(ellipse,var(--gglow) 0%,transparent 70%);pointer-events:none;z-index:0;}
-.hcnt{position:relative;z-index:1;max-width:800px;width:100%;}
+.hcnt{position:relative;z-index:1;max-width:800px;width:100%;text-align:center;margin:0 auto;}
 
 .heyebrow{font-family:var(--mono);font-size:.7rem;color:var(--blue);letter-spacing:.22em;text-transform:uppercase;
-  display:flex;align-items:center;gap:10px;margin-bottom:20px;
+  display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:20px;
   opacity:0;animation:fu .6s .15s ease forwards;}
 .heyebrow::before{content:'';width:26px;height:1px;background:var(--blue);}
+.heyebrow::after{content:'';width:26px;height:1px;background:var(--blue);}
 
-.hname{font-family:var(--head);font-size:clamp(2.8rem,9.5vw,6.2rem);font-weight:700;
+.hname{font-family:var(--head);font-size:clamp(2.8rem,9.5vw,6.2rem);font-weight:600;
   line-height:1;letter-spacing:-.02em;color:#fff;margin-bottom:20px;
   word-break:break-word;
   opacity:0;animation:fu .7s .3s ease forwards;}
@@ -75,10 +76,10 @@ nav.sc{border-color:rgba(0,196,80,.3);}
   opacity:0;animation:fu .7s .5s ease forwards;}
 .tb{display:inline-block;width:2px;height:.9em;background:var(--green);vertical-align:middle;margin-left:1px;animation:blink 1s step-end infinite;}
 
-.hdesc{font-size:.98rem;color:var(--dim);max-width:510px;line-height:1.85;margin-bottom:42px;
+.hdesc{font-size:.98rem;color:var(--dim);max-width:510px;line-height:1.85;margin-bottom:42px;margin-left:auto;margin-right:auto;
   opacity:0;animation:fu .7s .65s ease forwards;}
 
-.hcta{display:flex;gap:13px;flex-wrap:wrap;opacity:0;animation:fu .7s .8s ease forwards;}
+.hcta{display:flex;gap:13px;flex-wrap:wrap;justify-content:center;opacity:0;animation:fu .7s .8s ease forwards;}
 .btn{font-family:var(--mono);font-size:.73rem;padding:12px 28px;text-decoration:none;letter-spacing:.1em;text-transform:uppercase;transition:.24s;cursor:none;display:inline-block;}
 .btnp{border:1px solid var(--green);color:var(--green);position:relative;overflow:hidden;}
 .btnp::before{content:'';position:absolute;inset:0;background:var(--green);transform:translateX(-101%);transition:transform .27s ease;z-index:-1;}
@@ -112,7 +113,7 @@ section{padding:88px 5%;}
 .slink:hover{border-color:var(--green);color:var(--green);}
 
 /* ── SOCIAL ICON LOGOS (about section) ── */
-.sicons{display:flex;flex-wrap:wrap;gap:20px;margin-top:26px;}
+.sicons{display:flex;flex-wrap:wrap;gap:20px;margin-top:26px;justify-content:center;}
 .sibtn{
   display:flex;align-items:center;justify-content:center;
   color:var(--dim);text-decoration:none;
@@ -477,7 +478,7 @@ footer{background:var(--bg);border-top:1px solid var(--bdr);padding:26px 5%;text
 
 <footer>
   <div class="finner">
-    <div class="fbrand"><span>~/hextheshadow</span> · vulnerability researcher · 2026</div>
+    <div class="fbrand"><span>~/hextheshadow</span> · All rights reserved · @ 2026</div>
     <div class="fsub">built with intent. all research active.</div>
   </div>
 </footer>
