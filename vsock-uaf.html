@@ -5,22 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>vsock UAF Writeup — hextheshadow</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg:       #080808;
-  --surface:  #0f0f0f;
-  --border:   #1a1a1a;
-  --border2:  #242424;
-  --muted:    #404040;
-  --dim:      #606060;
-  --body:     #a8a8a8;
-  --text:     #d4d4d4;
-  --bright:   #f0f0f0;
-  --green:    #00e676;
-  --orange:   #ff6d00;
+  --bg:       #070a0d;
+  --surface:  #0b1510;
+  --surface2: #0c1117;
+  --border:   #182420;
+  --border2:  #1e2e28;
+  --muted:    #2a4030;
+  --dim:      #5a7263;
+  --body:     #8aaa96;
+  --text:     #c8ddd0;
+  --bright:   #f0f6f2;
+  --green:    #00ff6a;
+  --gdim:     #00c450;
+  --gglow:    rgba(0,255,106,.15);
+  --blue:     #00c8ff;
+  --orange:   #f59e0b;
   --mono:     'JetBrains Mono', monospace;
   --display:  'Syne', sans-serif;
   --serif:    'Instrument Serif', serif;
@@ -35,33 +39,55 @@ body {
   font-size: 13px;
   line-height: 1.75;
   overflow-x: hidden;
+  cursor: none;
 }
+
+/* scanline */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 9997; pointer-events: none;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);
+}
+
+/* cursor */
+.cursor { position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none; }
+.cdot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); position: absolute; transform: translate(-50%,-50%); box-shadow: 0 0 7px var(--green); }
+.cring { width: 27px; height: 27px; border-radius: 50%; border: 1px solid rgba(0,255,106,.35); position: absolute; transform: translate(-50%,-50%); transition: width .17s, height .17s, border-color .17s; }
+body:has(a:hover) .cring, body:has(button:hover) .cring { width: 40px; height: 40px; border-color: var(--blue); }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--gdim); }
 
 /* ── NAV ── */
 nav {
   position: sticky; top: 0; z-index: 100;
-  background: rgba(8,8,8,0.94);
-  backdrop-filter: blur(12px);
+  background: rgba(7,10,13,0.94);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
+  transition: border-color .3s;
 }
 .nav-inner {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 32px; max-width: 900px; margin: 0 auto;
+  padding: 15px 32px; max-width: 960px; margin: 0 auto;
 }
 .nav-logo {
-  font-family: var(--display); font-weight: 700; font-size: 14px;
-  color: var(--bright); text-decoration: none;
+  font-family: var(--mono); font-weight: 700; font-size: .82rem;
+  color: var(--green); text-decoration: none; letter-spacing: .06em;
 }
-.nav-logo span { color: var(--green); }
+.nav-logo span { color: var(--blue); }
 .nav-back {
-  font-size: 11px; color: var(--dim); text-decoration: none;
-  letter-spacing: 0.1em; text-transform: uppercase; transition: color 0.2s;
-  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: .68rem; color: var(--dim);
+  text-decoration: none; letter-spacing: .12em; text-transform: uppercase;
+  transition: color .2s; display: flex; align-items: center; gap: 6px;
+  position: relative;
 }
+.nav-back::after { content: ''; position: absolute; left: 0; bottom: -3px; width: 0; height: 1px; background: var(--green); transition: width .3s; }
 .nav-back:hover { color: var(--green); }
+.nav-back:hover::after { width: 100%; }
 
 /* ── LAYOUT ── */
-.wrap { max-width: 900px; margin: 0 auto; padding: 0 32px; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 32px; }
 
 /* ── HEADER ── */
 .post-header {
@@ -72,7 +98,7 @@ nav {
 .post-header::before {
   content: ''; position: absolute; top: -200px; right: -200px;
   width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(0,230,118,0.04) 0%, transparent 60%);
+  background: radial-gradient(circle, rgba(0,255,106,0.05) 0%, transparent 60%);
   pointer-events: none;
 }
 
@@ -102,7 +128,7 @@ nav {
 }
 .meta-item { display: flex; flex-direction: column; gap: 3px; }
 .meta-label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.meta-val   { font-size: 12px; color: var(--green); }
+.meta-val   { font-size: 12px; color: var(--green); font-weight: 500; }
 
 /* ── BODY LAYOUT ── */
 .post-body {
@@ -122,13 +148,13 @@ nav {
 }
 .toc-label {
   font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 12px;
+  color: var(--dim); margin-bottom: 12px;
 }
 .toc a {
   display: block; color: var(--dim); text-decoration: none;
-  padding: 3px 0; line-height: 1.4; transition: color 0.15s;
+  padding: 3px 0; line-height: 1.4; transition: color .15s, padding-left .15s;
 }
-.toc a:hover { color: var(--green); }
+.toc a:hover { color: var(--green); padding-left: 4px; }
 .toc-sub { padding-left: 10px; font-size: 10px; }
 
 /* ── CONTENT ── */
@@ -146,12 +172,15 @@ h2 {
   padding-bottom: 12px; border-bottom: 1px solid var(--border);
   letter-spacing: -0.01em;
 }
+h2::after { content: ''; display: block; width: 32px; height: 2px; background: linear-gradient(90deg, var(--green), var(--blue)); margin-top: 12px; }
 
 h3 {
   font-size: 11px; font-weight: 500; color: var(--green);
   letter-spacing: 0.1em; text-transform: uppercase;
   margin: 24px 0 10px;
+  display: flex; align-items: center; gap: 8px;
 }
+h3::before { content: '//'; color: var(--dim); font-size: 10px; }
 
 p { margin-bottom: 14px; color: var(--body); font-size: 13px; line-height: 1.8; }
 
@@ -179,8 +208,14 @@ pre {
   font-size: 11.5px;
   line-height: 1.7;
   color: var(--dim);
+  position: relative;
+}
+pre::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 1px; background: linear-gradient(90deg, var(--green), transparent);
 }
 pre.bad  { border-left-color: var(--orange); }
+pre.bad::before { background: linear-gradient(90deg, var(--orange), transparent); }
 pre.good { border-left-color: var(--green); }
 
 pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
@@ -199,9 +234,11 @@ pre code { background: none; border: none; padding: 0; color: inherit; font-size
   border: 1px solid var(--border2);
   padding: 16px 20px;
   margin: 16px 0; font-size: 12px; line-height: 1.75;
+  position: relative;
 }
-.callout-green  { border-left: 2px solid var(--green);  background: rgba(0,230,118,0.03); }
-.callout-orange { border-left: 2px solid var(--orange); background: rgba(255,109,0,0.03); }
+.callout::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, currentColor, transparent); opacity: .3; }
+.callout-green  { border-left: 2px solid var(--green);  background: rgba(0,255,106,0.03); }
+.callout-orange { border-left: 2px solid var(--orange); background: rgba(245,158,11,0.03); }
 .callout-dim    { border-left: 2px solid var(--border2); }
 
 .callout-title {
@@ -220,8 +257,8 @@ table {
 }
 th {
   text-align: left; padding: 8px 14px;
-  background: var(--surface); color: var(--green);
-  font-weight: 500; letter-spacing: 0.08em;
+  background: rgba(0,255,106,.03); color: var(--green);
+  font-weight: 500; letter-spacing: 0.1em;
   text-transform: uppercase; font-size: 9px;
   border-bottom: 1px solid var(--border);
 }
@@ -231,6 +268,7 @@ td {
   color: var(--body); vertical-align: top; line-height: 1.6;
 }
 tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(0,255,106,.015); }
 td.g { color: var(--green); }
 td.o { color: var(--orange); }
 td code { font-size: 10.5px; }
@@ -277,29 +315,44 @@ hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
 }
 .author-byline span { color: var(--green); }
 
+/* ── FOOTER ICON BTNS ── */
+.footer-icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--dim); text-decoration: none; position: relative;
+  transition: color .22s, transform .18s, filter .22s;
+  cursor: none;
+}
+.footer-icon-btn svg { width: 17px; height: 17px; fill: currentColor; transition: transform .2s; }
+.footer-icon-btn:hover { transform: translateY(-3px); }
+.footer-icon-btn.gh:hover { color: #f0f6fc; filter: drop-shadow(0 0 7px rgba(240,246,252,.4)); }
+.footer-icon-btn.li:hover { color: #0A66C2; filter: drop-shadow(0 0 7px rgba(10,102,194,.6)); }
+.footer-icon-btn.em { color: var(--green); }
+.footer-icon-btn.em:hover { filter: drop-shadow(0 0 7px rgba(0,255,106,.5)); }
+.footer-icon-btn.h1:hover { color: var(--orange); filter: drop-shadow(0 0 7px rgba(245,158,11,.5)); }
+.footer-icon-btn.bc:hover { color: var(--blue); filter: drop-shadow(0 0 7px rgba(0,200,255,.5)); }
+
 /* ── FOOTER ── */
 footer { padding: 40px 0; border-top: 1px solid var(--border); }
 .footer-inner {
   display: flex; justify-content: space-between;
   align-items: center; flex-wrap: wrap; gap: 16px;
 }
-.footer-left { font-family: var(--display); font-size: 13px; font-weight: 600; color: var(--muted); }
+.footer-left { font-family: var(--mono); font-size: .72rem; font-weight: 500; color: var(--dim); }
 .footer-left span { color: var(--green); }
-.footer-right { display: flex; gap: 24px; }
-.footer-right a { font-size: 11px; color: var(--muted); text-decoration: none; letter-spacing: 0.06em; transition: color 0.15s; }
-.footer-right a:hover { color: var(--green); }
+.footer-right { display: flex; gap: 10px; align-items: center; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 720px) {
   .wrap { padding: 0 20px; }
-  .nav-inner { padding: 14px 20px; }
+  .nav-inner { padding: 13px 20px; }
   .post-body { grid-template-columns: 1fr; gap: 0; padding: 40px 0; }
   .toc { display: none; }
   .post-header { padding: 40px 0 32px; }
   .post-meta { gap: 16px; }
   table { font-size: 11px; }
   pre { font-size: 11px; padding: 14px 16px; }
-  .footer-right { gap: 14px; flex-wrap: wrap; }
+  .footer-right { gap: 8px; flex-wrap: wrap; }
+  body { cursor: auto; } .cursor { display: none; }
 }
 
 @keyframes fadeUp {
@@ -315,11 +368,13 @@ footer { padding: 40px 0; border-top: 1px solid var(--border); }
 </head>
 <body>
 
+<div class="cursor"><div class="cring" id="cring"></div><div class="cdot" id="cdot"></div></div>
+
 <!-- NAV -->
 <nav>
   <div class="nav-inner">
-    <a href="/" class="nav-logo">hex<span>the</span>shadow</a>
-    <a href="/#writing" class="nav-back">← Writing</a>
+    <a href="/" class="nav-logo"><span>~/</span>hextheshadow</a>
+    <a href="/" class="nav-back">← index</a>
   </div>
 </nav>
 
@@ -853,14 +908,33 @@ New value = 0     <span class="bad">← kvfree_sensitive() zeroes temp payload b
     <div class="footer-inner">
       <div class="footer-left">hex<span>the</span>shadow · 2026</div>
       <div class="footer-right">
-        <a href="https://github.com/hextheshadow" target="_blank">github</a>
-        <a href="mailto:hextheshadow0x@gmail.com">email</a>
-        <a href="https://hackerone.com/h3xb1tx" target="_blank">hackerone</a>
-        <a href="https://bugcrowd.com/h/HexShadow" target="_blank">bugcrowd</a>
+        <a href="mailto:hextheshadow0x@gmail.com" class="footer-icon-btn em" title="email">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        </a>
+        <a href="https://github.com/hextheshadow" target="_blank" class="footer-icon-btn gh" title="github">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+        </a>
+        <a href="https://hackerone.com/h3xb1tx" target="_blank" class="footer-icon-btn h1" title="hackerone">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7.207 0c-.4.003-.733.1-.985.29L2.38 2.996a1.89 1.89 0 0 0-.707 1.484v15.04a1.89 1.89 0 0 0 .707 1.484l3.842 2.706c.517.39 1.278.393 1.793.007l3.984-2.84V11.94l-3.798 2.71V8.37l3.798-2.71v-3.9L7.816.052A1.77 1.77 0 0 0 7.207 0zm9.586 0c-.4.003-.733.1-.985.29l-3.984 2.87v3.9l3.798 2.71v5.95l-3.798-2.71v9.937l3.984 2.84c.517.387 1.276.384 1.793-.007l3.842-2.706A1.89 1.89 0 0 0 22 21.52V6.48a1.89 1.89 0 0 0-.707-1.484L17.45.29C17.2.1 16.865.003 16.465 0h-.328l.656.003z"/></svg>
+        </a>
+        <a href="https://bugcrowd.com/h/HexShadow" target="_blank" class="footer-icon-btn bc" title="bugcrowd">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4.5c1.381 0 2.5 1.119 2.5 2.5S13.381 9.5 12 9.5 9.5 8.381 9.5 7 10.619 4.5 12 4.5zm4 10.5a4 4 0 0 1-8 0v-2a4 4 0 0 1 8 0v2z"/></svg>
+        </a>
+        <a href="https://www.linkedin.com/in/haris-hussain-42b93138a" target="_blank" class="footer-icon-btn li" title="linkedin">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        </a>
       </div>
     </div>
   </div>
 </footer>
+
+<script>
+/* cursor */
+const dot=document.getElementById('cdot'),ring=document.getElementById('cring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+(function t(){dot.style.cssText=`left:${mx}px;top:${my}px`;rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.cssText=`left:${rx}px;top:${ry}px`;requestAnimationFrame(t);})();
+</script>
 
 </body>
 </html>
